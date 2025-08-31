@@ -649,10 +649,8 @@ All dependencies and their licenses are documented in the `LICENSES` directory.
 - **Wiki**: Extended documentation
 
 ### 📧 **Contact**
-
-- **Email**: satvik.praveen@example.com
 - **LinkedIn**: [SatvikPraveen](https://linkedin.com/in/satvikpraveen)
-- **Twitter**: [@SatvikPraveen](https://twitter.com/SatvikPraveen)
+
 
 ### ⭐ **Support the Project**
 
