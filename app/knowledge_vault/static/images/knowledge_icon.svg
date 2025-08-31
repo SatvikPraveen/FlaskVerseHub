@@ -1,0 +1,39 @@
+<!-- app/knowledge_vault/static/images/knowledge_icon.svg -->
+<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="knowledgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f97316;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Lightbulb base -->
+  <circle cx="12" cy="12" r="8" fill="rgba(245,158,11,0.1)" stroke="url(#knowledgeGradient)" stroke-width="1"/>
+  
+  <!-- Lightbulb shape -->
+  <path d="M8,10 Q8,6 12,6 Q16,6 16,10 Q16,13 14,14.5 L10,14.5 Q8,13 8,10 Z" 
+        fill="url(#knowledgeGradient)" filter="url(#glow)"/>
+  
+  <!-- Lightbulb base/screw -->
+  <rect x="10.5" y="14.5" width="3" height="2" fill="rgba(245,158,11,0.8)" rx="0.5"/>
+  <line x1="10" y1="15.5" x2="14" y2="15.5" stroke="rgba(0,0,0,0.2)" stroke-width="0.5"/>
+  
+  <!-- Filament -->
+  <path d="M10,9 Q12,11 14,9" stroke="rgba(255,255,255,0.7)" stroke-width="1" fill="none"/>
+  <path d="M10,11 Q12,9 14,11" stroke="rgba(255,255,255,0.7)" stroke-width="1" fill="none"/>
+  
+  <!-- Sparkles/knowledge rays -->
+  <g opacity="0.8">
+    <path d="M18,8 L19,9 L18,10 L17,9 Z" fill="url(#knowledgeGradient)"/>
+    <path d="M6,14 L7,15 L6,16 L5,15 Z" fill="url(#knowledgeGradient)"/>
+    <path d="M19,15 L20,16 L19,17 L18,16 Z" fill="url(#knowledgeGradient)"/>
+    <path d="M5,7 L6,8 L5,9 L4,8 Z" fill="url(#knowledgeGradient)"/>
+  </g>
+</svg>

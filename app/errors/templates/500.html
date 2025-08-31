@@ -1,0 +1,266 @@
+<!-- File: app/errors/templates/500.html -->
+{% extends "base.html" %} {% block title %}Server Error - FlaskVerseHub{%
+endblock %} {% block content %}
+<div class="error-container">
+  <div class="error-content">
+    <div class="error-illustration">
+      <svg
+        width="300"
+        height="200"
+        viewBox="0 0 300 200"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle
+          cx="150"
+          cy="100"
+          r="80"
+          fill="#fff5f5"
+          stroke="#fed7d7"
+          stroke-width="2"
+        />
+        <text
+          x="150"
+          y="110"
+          text-anchor="middle"
+          font-size="48"
+          font-weight="bold"
+          fill="#e53e3e"
+        >
+          500
+        </text>
+
+        <!-- Warning elements -->
+        <path d="M130 70 L170 70 L160 50 L140 50 Z" fill="#fed7d7" />
+        <circle cx="150" cy="60" r="3" fill="#e53e3e" />
+        <path
+          d="M150 65 L150 75"
+          stroke="#e53e3e"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+
+        <!-- Glitch effects -->
+        <rect
+          x="120"
+          y="120"
+          width="60"
+          height="4"
+          fill="#e53e3e"
+          opacity="0.8"
+        >
+          <animate
+            attributeName="opacity"
+            values="0.8;0.3;0.8"
+            dur="1s"
+            repeatCount="indefinite"
+          />
+        </rect>
+        <rect
+          x="110"
+          y="130"
+          width="80"
+          height="2"
+          fill="#fed7d7"
+          opacity="0.6"
+        >
+          <animate
+            attributeName="opacity"
+            values="0.6;0.9;0.6"
+            dur="1.2s"
+            repeatCount="indefinite"
+          />
+        </rect>
+      </svg>
+    </div>
+
+    <h1 class="error-title">Server Error</h1>
+    <p class="error-message">
+      Something went wrong on our end. We're working to fix this issue.
+    </p>
+
+    <div class="error-actions">
+      <a href="{{ url_for('knowledge_vault.index') }}" class="btn btn-primary">
+        <i class="icon-home"></i>
+        Go Home
+      </a>
+      <button onclick="window.location.reload()" class="btn btn-outline">
+        <i class="icon-refresh-cw"></i>
+        Try Again
+      </button>
+    </div>
+
+    <div class="error-help">
+      <h3>What happened?</h3>
+      <p>
+        Our server encountered an unexpected error while processing your
+        request. The development team has been automatically notified.
+      </p>
+
+      <h4>What can you do?</h4>
+      <ul>
+        <li>Wait a few minutes and try again</li>
+        <li>
+          Go back to the
+          <a href="{{ url_for('knowledge_vault.index') }}">homepage</a>
+        </li>
+        <li>
+          Check our
+          <a href="#" onclick="alert('Status page coming soon!')"
+            >status page</a
+          >
+          for updates
+        </li>
+        <li>Contact support if the problem persists</li>
+      </ul>
+    </div>
+
+    {% if config.DEBUG %}
+    <details class="error-debug">
+      <summary>Debug Information (Development Only)</summary>
+      <div class="debug-info">
+        <p><strong>Time:</strong> {{ moment().format('lll') }}</p>
+        <p><strong>Path:</strong> {{ request.path }}</p>
+        <p><strong>Method:</strong> {{ request.method }}</p>
+        <p>
+          <strong>User Agent:</strong> {{ request.user_agent.string[:100] }}...
+        </p>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+  .error-container {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .error-content {
+    text-align: center;
+    max-width: 600px;
+  }
+
+  .error-illustration {
+    margin-bottom: 2rem;
+  }
+
+  .error-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #e53e3e;
+    margin-bottom: 1rem;
+  }
+
+  .error-message {
+    font-size: 1.1rem;
+    color: #6c757d;
+    margin-bottom: 2rem;
+  }
+
+  .error-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 3rem;
+    flex-wrap: wrap;
+  }
+
+  .error-help {
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    padding: 2rem;
+    border-radius: 8px;
+    text-align: left;
+    margin-bottom: 2rem;
+  }
+
+  .error-help h3,
+  .error-help h4 {
+    margin-top: 0;
+    color: #742a2a;
+  }
+
+  .error-help h4 {
+    margin-top: 1.5rem;
+    font-size: 1rem;
+  }
+
+  .error-help p {
+    color: #6c757d;
+    line-height: 1.6;
+  }
+
+  .error-help ul {
+    margin-bottom: 0;
+  }
+
+  .error-help li {
+    margin-bottom: 0.5rem;
+    color: #6c757d;
+  }
+
+  .error-help a {
+    color: #e53e3e;
+    text-decoration: none;
+  }
+
+  .error-help a:hover {
+    text-decoration: underline;
+  }
+
+  .error-debug {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: left;
+    margin-top: 2rem;
+  }
+
+  .error-debug summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #4a5568;
+    margin-bottom: 1rem;
+  }
+
+  .debug-info {
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: #6c757d;
+  }
+
+  .debug-info p {
+    margin: 0.5rem 0;
+  }
+
+  @media (max-width: 768px) {
+    .error-title {
+      font-size: 2rem;
+    }
+
+    .error-actions {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .error-actions .btn {
+      width: 200px;
+    }
+  }
+</style>
+
+<script>
+  // Auto-refresh after 30 seconds
+  setTimeout(function () {
+    if (confirm("Would you like to try loading the page again?")) {
+      window.location.reload();
+    }
+  }, 30000);
+</script>
+{% endblock %}

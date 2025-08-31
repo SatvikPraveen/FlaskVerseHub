@@ -1,0 +1,76 @@
+# File: docker/docker-compose.yml
+
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://flaskuser:password@db:5432/flaskversehub
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=your-production-secret-key
+      - MAIL_SERVER=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USE_TLS=true
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ../uploads:/app/uploads
+      - ../logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - flaskverse
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=flaskversehub
+      - POSTGRES_USER=flaskuser
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - flaskverse
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - flaskverse
+    command: redis-server --appendonly yes
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../app/static:/var/www/static:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - flaskverse
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  flaskverse:
+    driver: bridge

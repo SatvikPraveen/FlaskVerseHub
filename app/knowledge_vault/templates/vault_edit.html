@@ -1,0 +1,339 @@
+<!-- File: app/knowledge_vault/templates/vault_edit.html -->
+{% extends "base.html" %} {% from "macros/form_macros.html" import render_field
+%} {% block title %}Edit {{ entry.title }} - Knowledge Vault{% endblock %} {%
+block extra_css %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('knowledge_vault.static', filename='css/vault.css') }}"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css"
+/>
+{% endblock %} {% block content %}
+<div class="vault-form-container">
+  <div class="form-header">
+    <nav class="breadcrumb">
+      <a href="{{ url_for('knowledge_vault.index') }}">Knowledge Vault</a>
+      <span class="breadcrumb-separator">›</span>
+      <a href="{{ url_for('knowledge_vault.detail', id=entry.id) }}"
+        >{{ entry.title|truncate(30) }}</a
+      >
+      <span class="breadcrumb-separator">›</span>
+      <span class="breadcrumb-current">Edit</span>
+    </nav>
+
+    <h1 class="form-title">
+      <i class="icon-edit"></i>
+      Edit Knowledge Entry
+    </h1>
+    <p class="form-subtitle">Update your knowledge entry</p>
+  </div>
+
+  <div class="form-content">
+    <form
+      method="POST"
+      enctype="multipart/form-data"
+      class="vault-form"
+      id="entryForm"
+    >
+      {{ form.hidden_tag() }}
+
+      <div class="form-section">
+        <h3 class="section-title">Basic Information</h3>
+
+        <div class="form-row">
+          <div class="form-group full-width">
+            {{ render_field(form.title, class="form-control form-control-lg") }}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half-width">
+            {{ render_field(form.category, class="form-control") }}
+          </div>
+          <div class="form-group half-width">
+            {{ render_field(form.tags, class="form-control") }}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group full-width">
+            {{ render_field(form.description, class="form-control", rows="3") }}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Content</h3>
+
+        <div class="content-toolbar">
+          <div class="toolbar-group">
+            <button
+              type="button"
+              class="toolbar-btn"
+              onclick="togglePreview()"
+              id="previewBtn"
+            >
+              <i class="icon-eye"></i> Preview
+            </button>
+            <button
+              type="button"
+              class="toolbar-btn"
+              onclick="toggleFullscreen()"
+            >
+              <i class="icon-maximize"></i> Fullscreen
+            </button>
+          </div>
+
+          <div class="toolbar-group">
+            <select
+              id="contentFormat"
+              class="toolbar-select"
+              onchange="setContentFormat()"
+            >
+              <option value="markdown">Markdown</option>
+              <option value="html">HTML</option>
+              <option value="plaintext">Plain Text</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="content-editor-container">
+          <div class="editor-wrapper">
+            {{ render_field(form.content, class="form-control content-editor",
+            rows="20", id="contentEditor") }}
+          </div>
+
+          <div
+            class="preview-wrapper"
+            id="contentPreview"
+            style="display: none"
+          >
+            <div class="preview-content" id="previewContent"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Additional Information</h3>
+
+        <div class="form-row">
+          <div class="form-group half-width">
+            {{ render_field(form.source_url, class="form-control") }}
+          </div>
+          <div class="form-group half-width">
+            {{ render_field(form.attachment, class="form-control-file") }} {% if
+            entry.attachment_filename %}
+            <div class="current-attachment">
+              <small>Current: {{ entry.attachment_filename }}</small>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Settings</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <div class="checkbox-group">
+              <div class="checkbox-item">
+                {{ form.is_public(class="form-check-input") }} {{
+                form.is_public.label(class="form-check-label") }}
+                <small class="form-text">Allow others to view this entry</small>
+              </div>
+
+              {% if current_user.is_admin %}
+              <div class="checkbox-item">
+                {{ form.is_featured(class="form-check-input") }} {{
+                form.is_featured.label(class="form-check-label") }}
+                <small class="form-text"
+                  >Feature this entry on the main page</small
+                >
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <div class="actions-left">
+          <button type="button" class="btn btn-outline" onclick="saveDraft()">
+            <i class="icon-save"></i> Save as Draft
+          </button>
+          <a
+            href="{{ url_for('knowledge_vault.detail', id=entry.id) }}"
+            class="btn btn-secondary"
+          >
+            <i class="icon-arrow-left"></i> Back to Entry
+          </a>
+        </div>
+
+        <div class="actions-right">
+          <a
+            href="{{ url_for('knowledge_vault.index') }}"
+            class="btn btn-secondary"
+          >
+            <i class="icon-x"></i> Cancel
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="icon-check"></i> Update Entry
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+
+<script>
+  let editor;
+  let isPreviewMode = false;
+  let isFullscreen = false;
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const textarea = document.getElementById("contentEditor");
+    editor = CodeMirror.fromTextArea(textarea, {
+      mode: "markdown",
+      theme: "monokai",
+      lineNumbers: true,
+      lineWrapping: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2,
+      tabSize: 2,
+    });
+
+    let saveTimeout;
+    editor.on("change", function () {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(function () {
+        autoSave();
+      }, 5000);
+    });
+
+    const form = document.getElementById("entryForm");
+    form.addEventListener("submit", function (e) {
+      editor.save();
+    });
+  });
+
+  function togglePreview() {
+    const previewBtn = document.getElementById("previewBtn");
+    const editorWrapper = document.querySelector(".editor-wrapper");
+    const previewWrapper = document.getElementById("contentPreview");
+    const previewContent = document.getElementById("previewContent");
+
+    if (!isPreviewMode) {
+      const content = editor.getValue();
+      const format = document.getElementById("contentFormat").value;
+
+      if (format === "markdown") {
+        previewContent.innerHTML = marked.parse(content);
+      } else if (format === "html") {
+        previewContent.innerHTML = content;
+      } else {
+        previewContent.innerHTML = "<pre>" + content + "</pre>";
+      }
+
+      editorWrapper.style.display = "none";
+      previewWrapper.style.display = "block";
+      previewBtn.innerHTML = '<i class="icon-edit"></i> Edit';
+      isPreviewMode = true;
+    } else {
+      editorWrapper.style.display = "block";
+      previewWrapper.style.display = "none";
+      previewBtn.innerHTML = '<i class="icon-eye"></i> Preview';
+      isPreviewMode = false;
+      editor.focus();
+    }
+  }
+
+  function toggleFullscreen() {
+    const container = document.querySelector(".content-editor-container");
+
+    if (!isFullscreen) {
+      container.classList.add("fullscreen");
+      editor.setSize(null, "80vh");
+      isFullscreen = true;
+    } else {
+      container.classList.remove("fullscreen");
+      editor.setSize(null, 400);
+      isFullscreen = false;
+    }
+
+    setTimeout(() => {
+      editor.refresh();
+    }, 100);
+  }
+
+  function setContentFormat() {
+    const format = document.getElementById("contentFormat").value;
+
+    switch (format) {
+      case "markdown":
+        editor.setOption("mode", "markdown");
+        break;
+      case "html":
+        editor.setOption("mode", "xml");
+        break;
+      default:
+        editor.setOption("mode", null);
+    }
+  }
+
+  function saveDraft() {
+    const formData = {
+      title: document.getElementById("title").value,
+      description: document.getElementById("description").value,
+      content: editor.getValue(),
+      category: document.getElementById("category").value,
+      tags: document.getElementById("tags").value,
+      source_url: document.getElementById("source_url").value,
+      timestamp: new Date().toISOString(),
+    };
+
+    localStorage.setItem(
+      "vault_entry_edit_draft_{{ entry.id }}",
+      JSON.stringify(formData)
+    );
+    showNotification("Draft saved locally", "success");
+  }
+
+  function autoSave() {
+    if (editor.getValue().length > 10) {
+      saveDraft();
+    }
+  }
+
+  function showNotification(message, type) {
+    const notification = document.createElement("div");
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+      notification.classList.add("show");
+    }, 100);
+
+    setTimeout(() => {
+      notification.classList.remove("show");
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 300);
+    }, 3000);
+  }
+</script>
+{% endblock %}

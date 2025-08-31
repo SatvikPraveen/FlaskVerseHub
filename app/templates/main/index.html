@@ -1,0 +1,135 @@
+<!-- File: FlaskVerseHub/app/templates/main/index.html -->
+{% extends "base.html" %} {% block title %}FlaskVerseHub - Home{% endblock %} {%
+block content %}
+<div class="container">
+  <div class="hero-section">
+    <h1 class="display-4">Welcome to FlaskVerseHub</h1>
+    <p class="lead">
+      A comprehensive Flask application demonstrating modern web development
+      practices.
+    </p>
+
+    <div class="mt-4">
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary btn-lg"
+        >Go to Dashboard</a
+      >
+      <a
+        href="{{ url_for('knowledge_vault.index') }}"
+        class="btn btn-outline-primary btn-lg"
+        >Knowledge Vault</a
+      >
+      {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg"
+        >Get Started</a
+      >
+      <a href="#features" class="btn btn-outline-primary btn-lg">Learn More</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Features Section -->
+  <div id="features" class="features-section mt-5">
+    <div class="row">
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          <div class="card-body text-center">
+            <i class="fas fa-book fa-3x text-primary mb-3"></i>
+            <h5 class="card-title">Knowledge Management</h5>
+            <p class="card-text">
+              Organize and manage your knowledge with our comprehensive CRUD
+              system.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          <div class="card-body text-center">
+            <i class="fas fa-plug fa-3x text-success mb-3"></i>
+            <h5 class="card-title">API Hub</h5>
+            <p class="card-text">
+              RESTful and GraphQL APIs with comprehensive documentation.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          <div class="card-body text-center">
+            <i class="fas fa-chart-dashboard fa-3x text-info mb-3"></i>
+            <h5 class="card-title">Real-time Dashboard</h5>
+            <p class="card-text">
+              Live analytics and monitoring with WebSocket integration.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Section -->
+  {% if stats %}
+  <div class="stats-section mt-5">
+    <h2 class="text-center mb-4">Platform Statistics</h2>
+    <div class="row text-center">
+      <div class="col-md-3 mb-3">
+        <div class="stat-card">
+          <h3 class="text-primary">{{ stats.total_items }}</h3>
+          <p>Knowledge Items</p>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="stat-card">
+          <h3 class="text-success">{{ stats.total_users }}</h3>
+          <p>Active Users</p>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="stat-card">
+          <h3 class="text-info">{{ stats.total_categories }}</h3>
+          <p>Categories</p>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="stat-card">
+          <h3 class="text-warning">{{ stats.total_views }}</h3>
+          <p>Total Views</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %} {% block styles %}
+<style>
+  .hero-section {
+    text-align: center;
+    padding: 4rem 0;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border-radius: 1rem;
+    margin: 2rem 0;
+  }
+
+  .features-section {
+    padding: 2rem 0;
+  }
+
+  .stats-section {
+    padding: 2rem 0;
+    background-color: #f8f9fa;
+    border-radius: 1rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-card h3 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,348 @@
+<!-- File: app/knowledge_vault/templates/vault_index.html -->
+{% extends "base.html" %}
+{% from "macros/pagination_macros.html" import render_pagination %}
+{% from "macros/form_macros.html" import render_field %}
+
+{% block title %}Knowledge Vault{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('knowledge_vault.static', filename='css/vault.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="vault-container">
+    <!-- Header Section -->
+    <div class="vault-header">
+        <div class="header-content">
+            <div class="header-left">
+                <img src="{{ url_for('knowledge_vault.static', filename='images/vault_banner.svg') }}" 
+                     alt="Knowledge Vault" class="vault-banner">
+                <div class="header-text">
+                    <h1 class="vault-title">Knowledge Vault</h1>
+                    <p class="vault-subtitle">Discover, share, and manage knowledge efficiently</p>
+                </div>
+            </div>
+            {% if current_user.is_authenticated %}
+            <div class="header-actions">
+                <a href="{{ url_for('knowledge_vault.create') }}" class="btn btn-primary">
+                    <i class="icon-plus"></i> New Entry
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="vault-filters">
+        <div class="search-section">
+            <form method="GET" action="{{ url_for('knowledge_vault.index') }}" class="search-form">
+                <div class="search-input-group">
+                    {{ render_field(search_form.query, class="search-input", value=query) }}
+                    <button type="submit" class="search-btn">
+                        <i class="icon-search"></i>
+                    </button>
+                </div>
+                
+                <div class="filter-controls">
+                    {{ render_field(search_form.category, class="filter-select", value=category) }}
+                    
+                    <select name="sort" class="filter-select" onchange="this.form.submit()">
+                        <option value="created_desc" {{ 'selected' if sort_by == 'created_desc' }}>Newest First</option>
+                        <option value="created_asc" {{ 'selected' if sort_by == 'created_asc' }}>Oldest First</option>
+                        <option value="title_asc" {{ 'selected' if sort_by == 'title_asc' }}>Title A-Z</option>
+                        <option value="title_desc" {{ 'selected' if sort_by == 'title_desc' }}>Title Z-A</option>
+                    </select>
+                    
+                    {% if query or category %}
+                    <a href="{{ url_for('knowledge_vault.index') }}" class="btn btn-outline">Clear Filters</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Featured Entries -->
+    {% if featured_entries %}
+    <div class="featured-section">
+        <h3 class="section-title">Featured Entries</h3>
+        <div class="featured-grid">
+            {% for entry in featured_entries %}
+            <div class="featured-card">
+                <div class="featured-content">
+                    <span class="featured-category">{{ entry.category|title }}</span>
+                    <h4 class="featured-title">
+                        <a href="{{ url_for('knowledge_vault.detail', id=entry.id) }}">{{ entry.title }}</a>
+                    </h4>
+                    <p class="featured-description">{{ entry.description|truncate(100) }}</p>
+                    <div class="featured-meta">
+                        <span class="author">by {{ entry.author.username }}</span>
+                        <span class="date">{{ entry.created_at.strftime('%b %d, %Y') }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <div class="vault-content">
+        <!-- Results Summary -->
+        <div class="results-summary">
+            <div class="results-count">
+                <strong>{{ entries.total }}</strong> 
+                {% if entries.total == 1 %}entry{% else %}entries{% endif %} found
+                {% if query %} for "{{ query }}"{% endif %}
+                {% if category %} in {{ category|title }}{% endif %}
+            </div>
+            
+            {% if current_user.is_authenticated and current_user.is_admin %}
+            <div class="bulk-actions">
+                <button class="btn btn-outline btn-sm" onclick="toggleBulkMode()">
+                    <i class="icon-check-square"></i> Bulk Actions
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Entries List -->
+        {% if entries.items %}
+        <div class="entries-list">
+            {% for entry in entries.items %}
+            <article class="entry-card" data-entry-id="{{ entry.id }}">
+                {% if current_user.is_authenticated and current_user.is_admin %}
+                <div class="bulk-checkbox" style="display: none;">
+                    <input type="checkbox" name="entry_ids" value="{{ entry.id }}" class="bulk-select">
+                </div>
+                {% endif %}
+                
+                <div class="entry-header">
+                    <div class="entry-meta">
+                        <span class="entry-category category-{{ entry.category }}">{{ entry.category|title }}</span>
+                        <time class="entry-date">{{ entry.created_at.strftime('%b %d, %Y') }}</time>
+                        {% if entry.is_featured %}
+                        <span class="featured-badge">Featured</span>
+                        {% endif %}
+                        {% if not entry.is_public %}
+                        <span class="private-badge">Private</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if current_user.is_authenticated and (entry.author == current_user or current_user.is_admin) %}
+                    <div class="entry-actions">
+                        <a href="{{ url_for('knowledge_vault.edit', id=entry.id) }}" class="btn btn-sm btn-outline">
+                            <i class="icon-edit"></i>
+                        </a>
+                        <button class="btn btn-sm btn-danger" onclick="confirmDelete({{ entry.id }}, '{{ entry.title }}')">
+                            <i class="icon-trash"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="entry-content">
+                    <h3 class="entry-title">
+                        <a href="{{ url_for('knowledge_vault.detail', id=entry.id) }}">{{ entry.title }}</a>
+                    </h3>
+                    
+                    {% if entry.description %}
+                    <p class="entry-description">{{ entry.description }}</p>
+                    {% endif %}
+                    
+                    <div class="entry-preview">
+                        {{ entry.content|truncate(200, True)|safe }}
+                    </div>
+                    
+                    {% if entry.tags %}
+                    <div class="entry-tags">
+                        {% for tag in entry.tags.split(',') %}
+                        <span class="tag">{{ tag.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="entry-footer">
+                        <div class="entry-author">
+                            <i class="icon-user"></i>
+                            <span>{{ entry.author.username if entry.author else 'Unknown' }}</span>
+                        </div>
+                        
+                        {% if entry.attachment_filename %}
+                        <div class="entry-attachment">
+                            <i class="icon-attachment"></i>
+                            <span>Has attachment</span>
+                        </div>
+                        {% endif %}
+                        
+                        <a href="{{ url_for('knowledge_vault.detail', id=entry.id) }}" class="read-more">
+                            Read More <i class="icon-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {{ render_pagination(entries, 'knowledge_vault.index', 
+            query=query, category=category, sort=sort_by) }}
+        
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <h3>No entries found</h3>
+            <p>
+                {% if query or category %}
+                Try adjusting your search criteria or 
+                <a href="{{ url_for('knowledge_vault.index') }}">browse all entries</a>.
+                {% else %}
+                The knowledge vault is empty. 
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('knowledge_vault.create') }}">Create the first entry!</a>
+                {% endif %}
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Bulk Actions Form -->
+{% if current_user.is_authenticated and current_user.is_admin %}
+<form id="bulkActionForm" method="POST" action="{{ url_for('knowledge_vault.bulk_actions') }}" style="display: none;">
+    {{ csrf_token() }}
+    <input type="hidden" name="entry_ids" id="selectedIds">
+    <input type="hidden" name="action" id="bulkAction">
+</form>
+{% endif %}
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete "<span id="deleteEntryTitle"></span>"?</p>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
+            <form id="deleteForm" method="POST" style="display: inline;">
+                {{ csrf_token() }}
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('knowledge_vault.static', filename='js/vault.js') }}"></script>
+<script>
+// Bulk actions functionality
+let bulkMode = false;
+
+function toggleBulkMode() {
+    bulkMode = !bulkMode;
+    const checkboxes = document.querySelectorAll('.bulk-checkbox');
+    const bulkBtn = document.querySelector('.bulk-actions button');
+    
+    checkboxes.forEach(cb => {
+        cb.style.display = bulkMode ? 'block' : 'none';
+    });
+    
+    bulkBtn.textContent = bulkMode ? 'Cancel Bulk' : 'Bulk Actions';
+    
+    if (bulkMode) {
+        showBulkActionBar();
+    } else {
+        hideBulkActionBar();
+        clearSelections();
+    }
+}
+
+function showBulkActionBar() {
+    const actionBar = document.createElement('div');
+    actionBar.id = 'bulkActionBar';
+    actionBar.className = 'bulk-action-bar';
+    actionBar.innerHTML = `
+        <div class="bulk-info">
+            <span id="selectedCount">0</span> entries selected
+        </div>
+        <div class="bulk-controls">
+            <select id="bulkActionSelect" class="form-control">
+                <option value="">Choose action...</option>
+                <option value="delete">Delete</option>
+                <option value="make_public">Make Public</option>
+                <option value="make_private">Make Private</option>
+            </select>
+            <button class="btn btn-primary" onclick="executeBulkAction()">Execute</button>
+        </div>
+    `;
+    
+    document.querySelector('.vault-content').insertBefore(actionBar, document.querySelector('.entries-list'));
+    
+    // Add event listeners to checkboxes
+    document.querySelectorAll('.bulk-select').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+}
+
+function hideBulkActionBar() {
+    const actionBar = document.getElementById('bulkActionBar');
+    if (actionBar) actionBar.remove();
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('.bulk-select:checked');
+    const countElement = document.getElementById('selectedCount');
+    if (countElement) {
+        countElement.textContent = selected.length;
+    }
+}
+
+function clearSelections() {
+    document.querySelectorAll('.bulk-select').forEach(cb => {
+        cb.checked = false;
+    });
+}
+
+function executeBulkAction() {
+    const selected = document.querySelectorAll('.bulk-select:checked');
+    const action = document.getElementById('bulkActionSelect').value;
+    
+    if (selected.length === 0) {
+        alert('Please select at least one entry.');
+        return;
+    }
+    
+    if (!action) {
+        alert('Please select an action.');
+        return;
+    }
+    
+    if (action === 'delete' && !confirm(`Are you sure you want to delete ${selected.length} entries?`)) {
+        return;
+    }
+    
+    const ids = Array.from(selected).map(cb => cb.value).join(',');
+    document.getElementById('selectedIds').value = ids;
+    document.getElementById('bulkAction').value = action;
+    document.getElementById('bulkActionForm').submit();
+}
+
+// Delete confirmation
+function confirmDelete(entryId, entryTitle) {
+    document.getElementById('deleteEntryTitle').textContent = entryTitle;
+    document.getElementById('deleteForm').action = `{{ url_for('knowledge_vault.delete', id=0) }}`.replace('0', entryId);
+    document.getElementById('deleteModal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
+    }
+});
+</script>
+{% endblock %}

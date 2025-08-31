@@ -1,0 +1,27 @@
+<!-- app/knowledge_vault/static/images/book_icon.svg -->
+<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bookIconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Book cover -->
+  <rect x="4" y="3" width="16" height="18" fill="url(#bookIconGradient)" rx="2"/>
+  <rect x="5" y="4" width="14" height="16" fill="rgba(255,255,255,0.1)" rx="1"/>
+  
+  <!-- Book spine -->
+  <rect x="4" y="3" width="3" height="18" fill="rgba(0,0,0,0.2)" rx="2"/>
+  
+  <!-- Pages -->
+  <rect x="7" y="6" width="10" height="1" fill="rgba(255,255,255,0.6)" rx="0.5"/>
+  <rect x="7" y="8" width="10" height="1" fill="rgba(255,255,255,0.6)" rx="0.5"/>
+  <rect x="7" y="10" width="8" height="1" fill="rgba(255,255,255,0.6)" rx="0.5"/>
+  <rect x="7" y="12" width="9" height="1" fill="rgba(255,255,255,0.6)" rx="0.5"/>
+  <rect x="7" y="14" width="7" height="1" fill="rgba(255,255,255,0.6)" rx="0.5"/>
+  
+  <!-- Bookmark -->
+  <rect x="17" y="3" width="2" height="8" fill="#f59e0b"/>
+  <path d="M17,11 L18,9 L19,11 Z" fill="#f59e0b"/>
+</svg>

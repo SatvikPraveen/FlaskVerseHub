@@ -1,0 +1,337 @@
+<!-- File: FlaskVerseHub/app/templates/shared_components/sidebar.html -->
+<div
+  class="sidebar bg-light border-end vh-100 position-sticky top-0"
+  style="width: 250px"
+>
+  <div class="sidebar-header p-3 border-bottom">
+    <h5 class="sidebar-title mb-0 d-flex align-items-center">
+      <i class="fas fa-chart-line text-primary me-2"></i>
+      Dashboard
+    </h5>
+    <button
+      type="button"
+      class="btn-close d-lg-none position-absolute top-0 end-0 m-2"
+      id="sidebarClose"
+    ></button>
+  </div>
+
+  <nav class="sidebar-nav p-0">
+    <!-- Overview Section -->
+    <div class="nav-section">
+      <h6
+        class="nav-section-title text-uppercase fw-bold text-muted px-3 py-2 mb-0 small"
+      >
+        Overview
+      </h6>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a
+            href="{{ url_for('dashboard.index') }}"
+            class="nav-link d-flex align-items-center py-2 px-3 {% if request.endpoint == 'dashboard.index' %}active bg-primary text-white{% endif %}"
+          >
+            <i class="fas fa-home me-2"></i>
+            <span>Home</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-chart-line me-2"></i>
+            <span>Analytics</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-file-alt me-2"></i>
+            <span>Reports</span>
+            <span class="badge bg-success ms-auto">New</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Knowledge Management -->
+    <div class="nav-section">
+      <h6
+        class="nav-section-title text-uppercase fw-bold text-muted px-3 py-2 mb-0 small"
+      >
+        Knowledge
+      </h6>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a
+            href="{{ url_for('knowledge_vault.index') }}"
+            class="nav-link d-flex align-items-center py-2 px-3 {% if request.blueprint == 'knowledge_vault' and request.endpoint == 'knowledge_vault.index' %}active bg-primary text-white{% endif %}"
+          >
+            <i class="fas fa-book me-2"></i>
+            <span>All Items</span>
+            {% if knowledge_count %}
+            <span class="badge bg-secondary ms-auto"
+              >{{ knowledge_count }}</span
+            >
+            {% endif %}
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-plus me-2"></i>
+            <span>Add New</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-tags me-2"></i>
+            <span>Categories</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-search me-2"></i>
+            <span>Search</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- API Management -->
+    <div class="nav-section">
+      <h6
+        class="nav-section-title text-uppercase fw-bold text-muted px-3 py-2 mb-0 small"
+      >
+        API Hub
+      </h6>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a
+            href="{{ url_for('api_hub.index') }}"
+            class="nav-link d-flex align-items-center py-2 px-3 {% if request.endpoint == 'api_hub.index' %}active bg-primary text-white{% endif %}"
+          >
+            <i class="fas fa-tachometer-alt me-2"></i>
+            <span>API Dashboard</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-key me-2"></i>
+            <span>API Keys</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-chart-bar me-2"></i>
+            <span>Usage Stats</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a
+            href="#"
+            class="nav-link d-flex align-items-center py-2 px-3"
+            target="_blank"
+          >
+            <i class="fas fa-external-link-alt me-2"></i>
+            <span>Documentation</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Real-time Features -->
+    <div class="nav-section">
+      <h6
+        class="nav-section-title text-uppercase fw-bold text-muted px-3 py-2 mb-0 small"
+      >
+        Real-time
+      </h6>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-broadcast-tower me-2"></i>
+            <span>Live Feed</span>
+            <span
+              class="badge bg-success rounded-pill ms-auto"
+              style="width: 8px; height: 8px"
+            ></span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-bell me-2"></i>
+            <span>Notifications</span>
+            <span class="badge bg-danger ms-auto">5</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-history me-2"></i>
+            <span>Activity Log</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- System Management -->
+    {% if current_user.is_admin %}
+    <div class="nav-section">
+      <h6
+        class="nav-section-title text-uppercase fw-bold text-muted px-3 py-2 mb-0 small"
+      >
+        Administration
+      </h6>
+      <ul class="nav flex-column">
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-shield-alt me-2"></i>
+            <span>Admin Panel</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-users me-2"></i>
+            <span>User Management</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center py-2 px-3">
+            <i class="fas fa-server me-2"></i>
+            <span>System Health</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="nav-section p-3">
+      <h6
+        class="nav-section-title text-uppercase fw-bold text-muted py-2 mb-2 small"
+      >
+        Quick Actions
+      </h6>
+      <div class="d-grid gap-2">
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          onclick="window.location.href='#'"
+        >
+          <i class="fas fa-plus me-1"></i>
+          Add Knowledge
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          onclick="exportData()"
+        >
+          <i class="fas fa-download me-1"></i>
+          Export Data
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-info btn-sm"
+          onclick="refreshDashboard()"
+        >
+          <i class="fas fa-sync me-1"></i>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sidebar Footer -->
+  <div class="sidebar-footer mt-auto p-3 border-top">
+    <div class="d-flex align-items-center mb-2">
+      <div class="flex-shrink-0">
+        <i class="fas fa-user-circle fa-2x text-primary"></i>
+      </div>
+      <div class="flex-grow-1 ms-2">
+        <div class="fw-bold small">{{ current_user.first_name }}</div>
+        <div class="text-muted small">
+          {{ 'Admin' if current_user.is_admin else 'User' }}
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center">
+        <span
+          class="badge bg-success rounded-pill me-2"
+          style="width: 8px; height: 8px"
+        ></span>
+        <small class="text-muted">Online</small>
+      </div>
+      <small class="text-muted">{{ moment().strftime('%H:%M') }}</small>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile sidebar overlay -->
+<div
+  class="sidebar-overlay d-lg-none position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-none"
+  id="sidebarOverlay"
+  style="z-index: 1040"
+></div>
+
+<script>
+  // Sidebar functionality
+  document.addEventListener("DOMContentLoaded", function () {
+    const sidebarClose = document.getElementById("sidebarClose");
+    const sidebarOverlay = document.getElementById("sidebarOverlay");
+    const sidebar = document.querySelector(".sidebar");
+
+    // Mobile sidebar toggle
+    const sidebarToggle = document.querySelector(
+      '[data-bs-toggle="offcanvas"]'
+    );
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener("click", function () {
+        sidebar.classList.add("show");
+        sidebarOverlay.classList.remove("d-none");
+      });
+    }
+
+    // Close sidebar
+    if (sidebarClose) {
+      sidebarClose.addEventListener("click", function () {
+        sidebar.classList.remove("show");
+        sidebarOverlay.classList.add("d-none");
+      });
+    }
+
+    if (sidebarOverlay) {
+      sidebarOverlay.addEventListener("click", function () {
+        sidebar.classList.remove("show");
+        sidebarOverlay.classList.add("d-none");
+      });
+    }
+
+    // Auto-close on mobile when clicking nav links
+    const navLinks = sidebar.querySelectorAll(".nav-link");
+    navLinks.forEach((link) => {
+      link.addEventListener("click", function () {
+        if (window.innerWidth < 992) {
+          sidebar.classList.remove("show");
+          sidebarOverlay.classList.add("d-none");
+        }
+      });
+    });
+  });
+
+  // Quick action functions
+  function exportData() {
+    showToast("Export feature coming soon!", "info");
+  }
+
+  function refreshDashboard() {
+    location.reload();
+  }
+
+  // Update time every minute
+  setInterval(function () {
+    const timeEl = document.querySelector(".sidebar-footer small:last-child");
+    if (timeEl) {
+      timeEl.textContent = new Date().toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    }
+  }, 60000);
+</script>

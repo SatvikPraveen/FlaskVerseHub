@@ -1,0 +1,295 @@
+<!-- File: FlaskVerseHub/app/templates/macros/pagination_macros.html -->
+
+{# Main pagination macro #}
+{% macro render_pagination(pagination, endpoint, **kwargs) %}
+{% if pagination.pages > 1 %}
+<nav aria-label="Pagination Navigation">
+    <ul class="pagination justify-content-center">
+        {# First page link #}
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            {% if pagination.has_prev %}
+                <a class="page-link" href="{{ url_for(endpoint, page=1, **kwargs) }}" aria-label="First">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            {% else %}
+                <span class="page-link" aria-label="First">
+                    <i class="fas fa-angle-double-left"></i>
+                </span>
+            {% endif %}
+        </li>
+
+        {# Previous page link #}
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            {% if pagination.has_prev %}
+                <a class="page-link" href="{{ url_for(endpoint, page=pagination.prev_num, **kwargs) }}" aria-label="Previous">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            {% else %}
+                <span class="page-link" aria-label="Previous">
+                    <i class="fas fa-angle-left"></i>
+                </span>
+            {% endif %}
+        </li>
+
+        {# Page number links #}
+        {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=3) %}
+            {% if page_num %}
+                {% if page_num != pagination.page %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for(endpoint, page=page_num, **kwargs) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item active" aria-current="page">
+                        <span class="page-link">{{ page_num }}</span>
+                    </li>
+                {% endif %}
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">…</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {# Next page link #}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            {% if pagination.has_next %}
+                <a class="page-link" href="{{ url_for(endpoint, page=pagination.next_num, **kwargs) }}" aria-label="Next">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            {% else %}
+                <span class="page-link" aria-label="Next">
+                    <i class="fas fa-angle-right"></i>
+                </span>
+            {% endif %}
+        </li>
+
+        {# Last page link #}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            {% if pagination.has_next %}
+                <a class="page-link" href="{{ url_for(endpoint, page=pagination.pages, **kwargs) }}" aria-label="Last">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            {% else %}
+                <span class="page-link" aria-label="Last">
+                    <i class="fas fa-angle-double-right"></i>
+                </span>
+            {% endif %}
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endmacro %}
+
+{# Simple pagination with just Previous/Next #}
+{% macro render_simple_pagination(pagination, endpoint, **kwargs) %}
+{% if pagination.has_prev or pagination.has_next %}
+<nav aria-label="Simple Pagination Navigation">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            {% if pagination.has_prev %}
+                <a href="{{ url_for(endpoint, page=pagination.prev_num, **kwargs) }}" class="btn btn-outline-primary">
+                    <i class="fas fa-chevron-left me-1"></i>
+                    Previous
+                </a>
+            {% endif %}
+        </div>
+        
+        <span class="pagination-info">
+            Page {{ pagination.page }} of {{ pagination.pages }}
+        </span>
+        
+        <div>
+            {% if pagination.has_next %}
+                <a href="{{ url_for(endpoint, page=pagination.next_num, **kwargs) }}" class="btn btn-outline-primary">
+                    Next
+                    <i class="fas fa-chevron-right ms-1"></i>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+{% endif %}
+{% endmacro %}
+
+{# Pagination info display #}
+{% macro render_pagination_info(pagination, item_name='items') %}
+<div class="pagination-info text-muted">
+    {% if pagination.total > 0 %}
+        <small>
+            Showing {{ pagination.per_page * (pagination.page - 1) + 1 }}
+            to {{ pagination.per_page * pagination.page if pagination.page < pagination.pages else pagination.total }}
+            of {{ pagination.total }} {{ item_name }}
+        </small>
+    {% else %}
+        <small>No {{ item_name }} found</small>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Per-page selector #}
+{% macro render_per_page_selector(current_per_page=10, endpoint='', options=[10, 25, 50, 100], **kwargs) %}
+<div class="d-flex align-items-center">
+    <label for="per-page-select" class="form-label me-2 mb-0">Items per page:</label>
+    <select id="per-page-select" class="form-select form-select-sm" style="width: auto;" onchange="changePerPage(this.value)">
+        {% for option in options %}
+            <option value="{{ option }}" {% if option == current_per_page %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<script>
+function changePerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1'); // Reset to first page
+    window.location.href = url.toString();
+}
+</script>
+{% endmacro %}
+
+{# Complete pagination component with info and per-page selector #}
+{% macro render_complete_pagination(pagination, endpoint, item_name='items', show_per_page=true, per_page_options=[10, 25, 50, 100], **kwargs) %}
+<div class="pagination-wrapper">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            {{ render_pagination_info(pagination, item_name) }}
+        </div>
+        
+        {% if show_per_page %}
+        <div>
+            {{ render_per_page_selector(pagination.per_page, endpoint, per_page_options, **kwargs) }}
+        </div>
+        {% endif %}
+    </div>
+    
+    {{ render_pagination(pagination, endpoint, **kwargs) }}
+</div>
+{% endmacro %}
+
+{# Mobile-friendly pagination #}
+{% macro render_mobile_pagination(pagination, endpoint, **kwargs) %}
+<div class="mobile-pagination">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="pagination-controls d-flex align-items-center">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for(endpoint, page=pagination.prev_num, **kwargs) }}" class="btn btn-outline-primary btn-sm me-2">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            {% endif %}
+            
+            <div class="page-info mx-2">
+                <span class="current-page fw-bold">{{ pagination.page }}</span>
+                <span class="page-separator"> / </span>
+                <span class="total-pages">{{ pagination.pages }}</span>
+            </div>
+            
+            {% if pagination.has_next %}
+                <a href="{{ url_for(endpoint, page=pagination.next_num, **kwargs) }}" class="btn btn-outline-primary btn-sm ms-2">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            {% endif %}
+        </div>
+        
+        <div class="pagination-jump">
+            <form method="GET" class="d-flex align-items-center">
+                {% for key, value in kwargs.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <label for="jump-to-page" class="form-label me-2 mb-0 small">Go to:</label>
+                <input type="number" id="jump-to-page" name="page" min="1" max="{{ pagination.pages }}" 
+                       placeholder="Page" class="form-control form-control-sm me-2" style="width: 80px;">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Go</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# Load more button for infinite scroll #}
+{% macro render_load_more(pagination, endpoint, load_text='Load More', **kwargs) %}
+{% if pagination.has_next %}
+<div class="text-center my-4">
+    <button type="button" class="btn btn-outline-primary load-more-btn" 
+            data-next-page="{{ pagination.next_num }}"
+            data-endpoint="{{ url_for(endpoint, **kwargs) }}">
+        <span class="load-more-text">{{ load_text }}</span>
+        <span class="load-more-spinner spinner-border spinner-border-sm d-none ms-2" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </span>
+    </button>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loadMoreBtn = document.querySelector('.load-more-btn');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', function() {
+            const nextPage = this.getAttribute('data-next-page');
+            const endpoint = this.getAttribute('data-endpoint');
+            const spinner = this.querySelector('.load-more-spinner');
+            const text = this.querySelector('.load-more-text');
+            
+            // Show loading state
+            spinner.classList.remove('d-none');
+            text.textContent = 'Loading...';
+            this.disabled = true;
+            
+            // Make AJAX request to load more content
+            fetch(`${endpoint}?page=${nextPage}`)
+                .then(response => response.text())
+                .then(html => {
+                    // Parse and append new content
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newItems = doc.querySelector('.items-container');
+                    if (newItems) {
+                        document.querySelector('.items-container').insertAdjacentHTML('beforeend', newItems.innerHTML);
+                    }
+                    
+                    // Update or hide load more button
+                    const newLoadMoreBtn = doc.querySelector('.load-more-btn');
+                    if (newLoadMoreBtn) {
+                        this.setAttribute('data-next-page', newLoadMoreBtn.getAttribute('data-next-page'));
+                    } else {
+                        this.remove();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading more items:', error);
+                    text.textContent = 'Error loading more';
+                })
+                .finally(() => {
+                    // Reset loading state
+                    spinner.classList.add('d-none');
+                    text.textContent = '{{ load_text }}';
+                    this.disabled = false;
+                });
+        });
+    }
+});
+</script>
+{% endif %}
+{% endmacro %}
+
+{# Pagination with jump to page input #}
+{% macro render_pagination_with_jump(pagination, endpoint, **kwargs) %}
+<nav aria-label="Pagination with Jump">
+    <div class="d-flex justify-content-center align-items-center">
+        {{ render_simple_pagination(pagination, endpoint, **kwargs) }}
+        
+        {% if pagination.pages > 5 %}
+        <div class="ms-4">
+            <form method="GET" class="d-flex align-items-center">
+                {% for key, value in kwargs.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <label for="page-jump" class="form-label me-2 mb-0 small">Jump to:</label>
+                <input type="number" id="page-jump" name="page" min="1" max="{{ pagination.pages }}" 
+                       class="form-control form-control-sm me-2" style="width: 80px;" placeholder="{{ pagination.page }}">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Go</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</nav>
+{% endmacro %}

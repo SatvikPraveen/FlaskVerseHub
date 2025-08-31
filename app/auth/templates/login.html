@@ -1,0 +1,203 @@
+<!-- File: app/auth/templates/login.html -->
+{% extends "base.html" %} {% from "macros/form_macros.html" import render_field
+%} {% block title %}Login - FlaskVerseHub{% endblock %} {% block extra_css %}
+<style>
+  .auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .auth-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    padding: 3rem;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .auth-logo {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .auth-logo h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #343a40;
+    margin: 0;
+  }
+
+  .auth-logo p {
+    color: #6c757d;
+    margin: 0.5rem 0 0;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .btn-primary {
+    background: #667eea;
+    color: white;
+    width: 100%;
+  }
+
+  .btn-primary:hover {
+    background: #5a67d8;
+    transform: translateY(-1px);
+  }
+
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+  }
+
+  .auth-links {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e9ecef;
+  }
+
+  .auth-links a {
+    color: #667eea;
+    text-decoration: none;
+    margin: 0 1rem;
+  }
+
+  .auth-links a:hover {
+    text-decoration: underline;
+  }
+
+  .auth-footer {
+    text-align: center;
+    margin-top: 1.5rem;
+    color: #6c757d;
+    font-size: 0.875rem;
+  }
+
+  .error-list {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+
+  .error-list ul {
+    margin: 0;
+    padding-left: 1rem;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h1>FlaskVerseHub</h1>
+      <p>Welcome back!</p>
+    </div>
+
+    <form method="POST" class="auth-form">
+      {{ form.hidden_tag() }}
+
+      <div class="form-group">
+        {{ form.username.label(class="form-label") }} {{
+        form.username(class="form-control") }} {% if form.username.errors %}
+        <div class="error-list">
+          <ul>
+            {% for error in form.username.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        {{ form.password.label(class="form-label") }} {{
+        form.password(class="form-control") }} {% if form.password.errors %}
+        <div class="error-list">
+          <ul>
+            {% for error in form.password.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="checkbox-group">
+        {{ form.remember_me(class="form-check-input") }} {{
+        form.remember_me.label(class="form-check-label") }}
+      </div>
+
+      <button type="submit" class="btn btn-primary">Sign In</button>
+    </form>
+
+    <div class="auth-links">
+      <a href="{{ url_for('auth.reset_password_request') }}"
+        >Forgot Password?</a
+      >
+      <a href="{{ url_for('auth.register') }}">Create Account</a>
+    </div>
+
+    <div class="auth-footer">
+      <p>
+        Don't have an account?
+        <a href="{{ url_for('auth.register') }}">Sign up now</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // Focus on username field
+    const usernameField = document.getElementById("username");
+    if (usernameField) {
+      usernameField.focus();
+    }
+
+    // Add loading state to form submission
+    const form = document.querySelector(".auth-form");
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    form.addEventListener("submit", function () {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Signing In...";
+    });
+  });
+</script>
+{% endblock %}

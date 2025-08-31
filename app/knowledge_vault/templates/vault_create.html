@@ -1,0 +1,532 @@
+<!-- File: app/knowledge_vault/templates/vault_create.html -->
+{% extends "base.html" %} {% from "macros/form_macros.html" import render_field
+%} {% block title %}Create Entry - Knowledge Vault{% endblock %} {% block
+extra_css %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('knowledge_vault.static', filename='css/vault.css') }}"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css"
+/>
+{% endblock %} {% block content %}
+<div class="vault-form-container">
+  <!-- Header -->
+  <div class="form-header">
+    <nav class="breadcrumb">
+      <a href="{{ url_for('knowledge_vault.index') }}">Knowledge Vault</a>
+      <span class="breadcrumb-separator">›</span>
+      <span class="breadcrumb-current">Create New Entry</span>
+    </nav>
+
+    <h1 class="form-title">
+      <i class="icon-plus"></i>
+      Create New Knowledge Entry
+    </h1>
+    <p class="form-subtitle">Share your knowledge with the community</p>
+  </div>
+
+  <!-- Form -->
+  <div class="form-content">
+    <form
+      method="POST"
+      enctype="multipart/form-data"
+      class="vault-form"
+      id="entryForm"
+    >
+      {{ form.hidden_tag() }}
+
+      <!-- Basic Information -->
+      <div class="form-section">
+        <h3 class="section-title">Basic Information</h3>
+
+        <div class="form-row">
+          <div class="form-group full-width">
+            {{ render_field(form.title, class="form-control form-control-lg",
+            placeholder="Enter a descriptive title for your knowledge entry") }}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half-width">
+            {{ render_field(form.category, class="form-control") }}
+          </div>
+          <div class="form-group half-width">
+            {{ render_field(form.tags, class="form-control",
+            placeholder="programming, web-development, tutorial") }}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group full-width">
+            {{ render_field(form.description, class="form-control", rows="3",
+            placeholder="Brief description of this knowledge entry...") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="form-section">
+        <h3 class="section-title">Content</h3>
+
+        <div class="content-toolbar">
+          <div class="toolbar-group">
+            <button
+              type="button"
+              class="toolbar-btn"
+              onclick="togglePreview()"
+              id="previewBtn"
+            >
+              <i class="icon-eye"></i> Preview
+            </button>
+            <button
+              type="button"
+              class="toolbar-btn"
+              onclick="toggleFullscreen()"
+            >
+              <i class="icon-maximize"></i> Fullscreen
+            </button>
+          </div>
+
+          <div class="toolbar-group">
+            <select
+              id="contentFormat"
+              class="toolbar-select"
+              onchange="setContentFormat()"
+            >
+              <option value="markdown">Markdown</option>
+              <option value="html">HTML</option>
+              <option value="plaintext">Plain Text</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="content-editor-container">
+          <div class="editor-wrapper">
+            {{ render_field(form.content, class="form-control content-editor",
+            rows="20", id="contentEditor") }}
+          </div>
+
+          <div
+            class="preview-wrapper"
+            id="contentPreview"
+            style="display: none"
+          >
+            <div class="preview-content" id="previewContent">
+              <!-- Preview will be rendered here -->
+            </div>
+          </div>
+        </div>
+
+        <div class="content-help">
+          <details class="help-section">
+            <summary>Formatting Help</summary>
+            <div class="help-content">
+              <div class="help-column">
+                <h4>Markdown Syntax</h4>
+                <ul>
+                  <li><code># Heading 1</code></li>
+                  <li><code>## Heading 2</code></li>
+                  <li><code>**bold text**</code></li>
+                  <li><code>*italic text*</code></li>
+                  <li><code>`code`</code></li>
+                  <li><code>[link](url)</code></li>
+                </ul>
+              </div>
+              <div class="help-column">
+                <h4>Code Blocks</h4>
+                <pre><code>```python
+def hello():
+    print("Hello World!")
+```</code></pre>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <!-- Additional Information -->
+      <div class="form-section">
+        <h3 class="section-title">Additional Information</h3>
+
+        <div class="form-row">
+          <div class="form-group half-width">
+            {{ render_field(form.source_url, class="form-control",
+            placeholder="https://example.com/source") }}
+          </div>
+          <div class="form-group half-width">
+            {{ render_field(form.attachment, class="form-control-file") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="form-section">
+        <h3 class="section-title">Settings</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <div class="checkbox-group">
+              <div class="checkbox-item">
+                {{ form.is_public(class="form-check-input") }} {{
+                form.is_public.label(class="form-check-label") }}
+                <small class="form-text">Allow others to view this entry</small>
+              </div>
+
+              {% if current_user.is_admin %}
+              <div class="checkbox-item">
+                {{ form.is_featured(class="form-check-input") }} {{
+                form.is_featured.label(class="form-check-label") }}
+                <small class="form-text"
+                  >Feature this entry on the main page</small
+                >
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <div class="actions-left">
+          <button type="button" class="btn btn-outline" onclick="saveDraft()">
+            <i class="icon-save"></i> Save as Draft
+          </button>
+        </div>
+
+        <div class="actions-right">
+          <a
+            href="{{ url_for('knowledge_vault.index') }}"
+            class="btn btn-secondary"
+          >
+            <i class="icon-x"></i> Cancel
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="icon-check"></i> Create Entry
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tag Suggestions Modal -->
+<div id="tagSuggestionsModal" class="modal" style="display: none">
+  <div class="modal-content">
+    <h3>Popular Tags</h3>
+    <div class="tag-suggestions" id="tagSuggestions">
+      <!-- Tags will be loaded here -->
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeTagSuggestions()">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+<script src="{{ url_for('knowledge_vault.static', filename='js/vault.js') }}"></script>
+
+<script>
+  let editor;
+  let isPreviewMode = false;
+  let isFullscreen = false;
+
+  document.addEventListener("DOMContentLoaded", function () {
+    // Initialize CodeMirror editor
+    const textarea = document.getElementById("contentEditor");
+    editor = CodeMirror.fromTextArea(textarea, {
+      mode: "markdown",
+      theme: "monokai",
+      lineNumbers: true,
+      lineWrapping: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2,
+      tabSize: 2,
+      extraKeys: {
+        "Ctrl-S": function () {
+          saveDraft();
+        },
+        F11: function () {
+          toggleFullscreen();
+        },
+        "Ctrl-P": function () {
+          togglePreview();
+        },
+      },
+    });
+
+    // Auto-save functionality
+    let saveTimeout;
+    editor.on("change", function () {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(function () {
+        autoSave();
+      }, 5000); // Auto-save after 5 seconds of inactivity
+    });
+
+    // Load draft if exists
+    loadDraft();
+
+    // Tag input enhancements
+    enhanceTagInput();
+
+    // Form validation
+    setupFormValidation();
+  });
+
+  function togglePreview() {
+    const previewBtn = document.getElementById("previewBtn");
+    const editorWrapper = document.querySelector(".editor-wrapper");
+    const previewWrapper = document.getElementById("contentPreview");
+    const previewContent = document.getElementById("previewContent");
+
+    if (!isPreviewMode) {
+      // Show preview
+      const content = editor.getValue();
+      const format = document.getElementById("contentFormat").value;
+
+      if (format === "markdown") {
+        previewContent.innerHTML = marked.parse(content);
+      } else if (format === "html") {
+        previewContent.innerHTML = content;
+      } else {
+        previewContent.innerHTML = "<pre>" + content + "</pre>";
+      }
+
+      editorWrapper.style.display = "none";
+      previewWrapper.style.display = "block";
+      previewBtn.innerHTML = '<i class="icon-edit"></i> Edit';
+      isPreviewMode = true;
+    } else {
+      // Show editor
+      editorWrapper.style.display = "block";
+      previewWrapper.style.display = "none";
+      previewBtn.innerHTML = '<i class="icon-eye"></i> Preview';
+      isPreviewMode = false;
+      editor.focus();
+    }
+  }
+
+  function toggleFullscreen() {
+    const container = document.querySelector(".content-editor-container");
+
+    if (!isFullscreen) {
+      container.classList.add("fullscreen");
+      editor.setSize(null, "80vh");
+      isFullscreen = true;
+    } else {
+      container.classList.remove("fullscreen");
+      editor.setSize(null, 400);
+      isFullscreen = false;
+    }
+
+    setTimeout(() => {
+      editor.refresh();
+    }, 100);
+  }
+
+  function setContentFormat() {
+    const format = document.getElementById("contentFormat").value;
+
+    switch (format) {
+      case "markdown":
+        editor.setOption("mode", "markdown");
+        break;
+      case "html":
+        editor.setOption("mode", "xml");
+        break;
+      default:
+        editor.setOption("mode", null);
+    }
+  }
+
+  function saveDraft() {
+    const formData = new FormData(document.getElementById("entryForm"));
+    formData.set("content", editor.getValue());
+
+    // Save to localStorage
+    const draftData = {
+      title: formData.get("title"),
+      description: formData.get("description"),
+      content: editor.getValue(),
+      category: formData.get("category"),
+      tags: formData.get("tags"),
+      source_url: formData.get("source_url"),
+      is_public: formData.get("is_public"),
+      is_featured: formData.get("is_featured"),
+      timestamp: new Date().toISOString(),
+    };
+
+    localStorage.setItem("vault_entry_draft", JSON.stringify(draftData));
+    showNotification("Draft saved locally", "success");
+  }
+
+  function loadDraft() {
+    const draft = localStorage.getItem("vault_entry_draft");
+    if (draft) {
+      const data = JSON.parse(draft);
+
+      // Ask user if they want to restore draft
+      if (confirm("A draft was found. Would you like to restore it?")) {
+        document.getElementById("title").value = data.title || "";
+        document.getElementById("description").value = data.description || "";
+        editor.setValue(data.content || "");
+        document.getElementById("category").value = data.category || "";
+        document.getElementById("tags").value = data.tags || "";
+        document.getElementById("source_url").value = data.source_url || "";
+        document.getElementById("is_public").checked = data.is_public;
+        document.getElementById("is_featured").checked = data.is_featured;
+      }
+    }
+  }
+
+  function autoSave() {
+    if (editor.getValue().length > 10) {
+      saveDraft();
+    }
+  }
+
+  function enhanceTagInput() {
+    const tagInput = document.getElementById("tags");
+
+    tagInput.addEventListener("focus", function () {
+      loadTagSuggestions();
+    });
+
+    tagInput.addEventListener("keydown", function (e) {
+      if (e.key === "Tab" || e.key === ",") {
+        e.preventDefault();
+        const value = this.value.trim();
+        if (value && !value.endsWith(",")) {
+          this.value = value + ", ";
+        }
+      }
+    });
+  }
+
+  function loadTagSuggestions() {
+    // This would typically load from an API
+    const popularTags = [
+      "programming",
+      "web-development",
+      "python",
+      "javascript",
+      "tutorial",
+      "documentation",
+      "best-practices",
+      "guide",
+      "reference",
+      "tips",
+    ];
+
+    const suggestionsContainer = document.getElementById("tagSuggestions");
+    suggestionsContainer.innerHTML = popularTags
+      .map(
+        (tag) =>
+          `<span class="tag-suggestion" onclick="addTag('${tag}')">${tag}</span>`
+      )
+      .join("");
+  }
+
+  function addTag(tag) {
+    const tagInput = document.getElementById("tags");
+    const currentTags = tagInput.value
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t);
+
+    if (!currentTags.includes(tag)) {
+      currentTags.push(tag);
+      tagInput.value = currentTags.join(", ");
+    }
+  }
+
+  function closeTagSuggestions() {
+    document.getElementById("tagSuggestionsModal").style.display = "none";
+  }
+
+  function setupFormValidation() {
+    const form = document.getElementById("entryForm");
+
+    form.addEventListener("submit", function (e) {
+      // Update textarea with editor content before submit
+      editor.save();
+
+      // Clear draft on successful submission
+      if (validateForm()) {
+        localStorage.removeItem("vault_entry_draft");
+      }
+    });
+  }
+
+  function validateForm() {
+    const title = document.getElementById("title").value.trim();
+    const content = editor.getValue().trim();
+
+    if (!title) {
+      showNotification("Title is required", "error");
+      return false;
+    }
+
+    if (!content) {
+      showNotification("Content is required", "error");
+      return false;
+    }
+
+    return true;
+  }
+
+  function showNotification(message, type) {
+    const notification = document.createElement("div");
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+      notification.classList.add("show");
+    }, 100);
+
+    setTimeout(() => {
+      notification.classList.remove("show");
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 300);
+    }, 3000);
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener("keydown", function (e) {
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key) {
+        case "s":
+          e.preventDefault();
+          saveDraft();
+          break;
+        case "Enter":
+          if (e.shiftKey) {
+            e.preventDefault();
+            document.getElementById("entryForm").submit();
+          }
+          break;
+      }
+    }
+
+    if (e.key === "Escape" && isFullscreen) {
+      toggleFullscreen();
+    }
+  });
+</script>
+{% endblock %}

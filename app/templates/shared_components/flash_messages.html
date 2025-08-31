@@ -1,0 +1,448 @@
+<!-- File: FlaskVerseHub/app/templates/shared_components/flash_messages.html -->
+
+<!-- Flash Messages from Flask -->
+{% with messages = get_flashed_messages(with_categories=true) %} {% if messages
+%}
+<div
+  class="flash-messages-container position-fixed top-0 end-0 p-3"
+  style="z-index: 1050; max-width: 400px"
+>
+  {% for category, message in messages %}
+  <div
+    class="alert alert-{{ 'danger' if category == 'error' else 'warning' if category == 'warning' else 'info' if category == 'info' else 'success' }} alert-dismissible fade show flash-message shadow-sm mb-2"
+    role="alert"
+  >
+    <div class="d-flex align-items-start">
+      <div class="flex-shrink-0 me-3">
+        {% if category == 'error' %}
+        <i class="fas fa-exclamation-circle fa-lg"></i>
+        {% elif category == 'warning' %}
+        <i class="fas fa-exclamation-triangle fa-lg"></i>
+        {% elif category == 'info' %}
+        <i class="fas fa-info-circle fa-lg"></i>
+        {% elif category == 'success' %}
+        <i class="fas fa-check-circle fa-lg"></i>
+        {% else %}
+        <i class="fas fa-bell fa-lg"></i>
+        {% endif %}
+      </div>
+      <div class="flex-grow-1">
+        <div class="alert-message">{{ message }}</div>
+      </div>
+    </div>
+    <button
+      type="button"
+      class="btn-close"
+      data-bs-dismiss="alert"
+      aria-label="Close"
+    ></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %} {% endwith %}
+
+<!-- Toast Container for JavaScript-triggered notifications -->
+<div
+  class="toast-container position-fixed top-0 end-0 p-3"
+  id="toastContainer"
+  style="z-index: 1055"
+>
+  <!-- Dynamic toasts will be inserted here -->
+</div>
+
+<!-- Notification Sound (optional) -->
+<audio id="notificationSound" preload="auto" style="display: none">
+  <source
+    src="{{ url_for('static', filename='sounds/notification.mp3') }}"
+    type="audio/mpeg"
+  />
+  <source
+    src="{{ url_for('static', filename='sounds/notification.ogg') }}"
+    type="audio/ogg"
+  />
+</audio>
+
+<style>
+  .flash-message {
+    border-radius: 0.5rem;
+    border: none;
+    animation: slideInRight 0.3s ease-out;
+  }
+
+  .flash-message .alert-message {
+    line-height: 1.4;
+  }
+
+  .toast {
+    border-radius: 0.5rem;
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+
+  .toast-header {
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+
+  .toast-body {
+    border-radius: 0 0 0.5rem 0.5rem;
+  }
+
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+  }
+
+  .flash-message.fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
+  }
+</style>
+
+<script>
+  // Flash messages functionality
+  document.addEventListener("DOMContentLoaded", function () {
+    initializeFlashMessages();
+    initializeToastSystem();
+  });
+
+  /**
+   * Initialize flash messages with auto-dismiss
+   */
+  function initializeFlashMessages() {
+    const flashMessages = document.querySelectorAll(".flash-message");
+
+    flashMessages.forEach(function (message, index) {
+      // Stagger the appearance of multiple messages
+      setTimeout(function () {
+        message.style.transform = "translateX(0)";
+        message.style.opacity = "1";
+      }, index * 100);
+
+      // Auto-dismiss based on type
+      const alertType = message.classList.contains("alert-success")
+        ? "success"
+        : message.classList.contains("alert-info")
+        ? "info"
+        : message.classList.contains("alert-warning")
+        ? "warning"
+        : "error";
+
+      const dismissTime = getDismissTime(alertType);
+
+      if (dismissTime > 0) {
+        setTimeout(function () {
+          dismissFlashMessage(message);
+        }, dismissTime);
+      }
+
+      // Add click to dismiss functionality
+      message.addEventListener("click", function (e) {
+        if (!e.target.classList.contains("btn-close")) {
+          dismissFlashMessage(message);
+        }
+      });
+    });
+  }
+
+  /**
+   * Get auto-dismiss time based on message type
+   */
+  function getDismissTime(type) {
+    const times = {
+      success: 4000, // 4 seconds
+      info: 6000, // 6 seconds
+      warning: 8000, // 8 seconds
+      error: 0, // Manual dismiss only
+    };
+    return times[type] || 5000;
+  }
+
+  /**
+   * Dismiss flash message with animation
+   */
+  function dismissFlashMessage(message) {
+    message.classList.add("fade-out");
+    setTimeout(function () {
+      if (message.parentNode) {
+        const alert = new bootstrap.Alert(message);
+        alert.close();
+      }
+    }, 300);
+  }
+
+  /**
+   * Initialize toast notification system
+   */
+  function initializeToastSystem() {
+    // Make toast functions globally available
+    window.showToast = showToast;
+    window.showSuccess = function (message, duration = 4000) {
+      showToast(message, "success", duration);
+    };
+    window.showError = function (message, duration = 0) {
+      showToast(message, "error", duration);
+    };
+    window.showWarning = function (message, duration = 6000) {
+      showToast(message, "warning", duration);
+    };
+    window.showInfo = function (message, duration = 5000) {
+      showToast(message, "info", duration);
+    };
+  }
+
+  /**
+   * Show toast notification
+   */
+  function showToast(message, type = "info", duration = 5000, options = {}) {
+    const toastContainer = document.getElementById("toastContainer");
+    const toastId =
+      "toast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+
+    // Toast configuration
+    const config = {
+      id: toastId,
+      message: message,
+      type: type,
+      duration: duration,
+      showProgress: options.showProgress !== false,
+      playSound: options.playSound !== false,
+      allowHtml: options.allowHtml === true,
+      ...options,
+    };
+
+    // Create toast element
+    const toastElement = createToastElement(config);
+    toastContainer.appendChild(toastElement);
+
+    // Initialize Bootstrap toast
+    const toast = new bootstrap.Toast(toastElement, {
+      autohide: duration > 0,
+      delay: duration,
+    });
+
+    // Show toast
+    toast.show();
+
+    // Play notification sound
+    if (config.playSound && isNotificationSoundEnabled()) {
+      playNotificationSound();
+    }
+
+    // Add progress bar if enabled
+    if (config.showProgress && duration > 0) {
+      addProgressBar(toastElement, duration);
+    }
+
+    // Remove from DOM when hidden
+    toastElement.addEventListener("hidden.bs.toast", function () {
+      if (toastElement.parentNode) {
+        toastElement.parentNode.removeChild(toastElement);
+      }
+    });
+
+    // Return toast instance for external control
+    return {
+      element: toastElement,
+      toast: toast,
+      hide: function () {
+        toast.hide();
+      },
+    };
+  }
+
+  /**
+   * Create toast HTML element
+   */
+  function createToastElement(config) {
+    const iconMap = {
+      success: { icon: "fas fa-check-circle", bgClass: "bg-success" },
+      error: { icon: "fas fa-exclamation-circle", bgClass: "bg-danger" },
+      warning: { icon: "fas fa-exclamation-triangle", bgClass: "bg-warning" },
+      info: { icon: "fas fa-info-circle", bgClass: "bg-info" },
+    };
+
+    const iconConfig = iconMap[config.type] || iconMap.info;
+    const timeText = new Date().toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.id = config.id;
+    toast.setAttribute("role", "alert");
+    toast.setAttribute("aria-live", "assertive");
+    toast.setAttribute("aria-atomic", "true");
+
+    toast.innerHTML = `
+        <div class="toast-header ${iconConfig.bgClass} text-white">
+            <i class="${iconConfig.icon} me-2"></i>
+            <strong class="me-auto">${config.title || "FlaskVerseHub"}</strong>
+            <small class="text-white-50">${timeText}</small>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            ${config.allowHtml ? config.message : escapeHtml(config.message)}
+            ${
+              config.showProgress && config.duration > 0
+                ? '<div class="toast-progress"><div class="toast-progress-bar"></div></div>'
+                : ""
+            }
+        </div>
+    `;
+
+    return toast;
+  }
+
+  /**
+   * Add progress bar animation to toast
+   */
+  function addProgressBar(toastElement, duration) {
+    const progressBar = toastElement.querySelector(".toast-progress-bar");
+    if (progressBar) {
+      progressBar.style.cssText = `
+            width: 0%;
+            height: 3px;
+            background-color: rgba(0, 0, 0, 0.2);
+            transition: width ${duration}ms linear;
+            margin-top: 0.5rem;
+            border-radius: 2px;
+        `;
+
+      // Start progress animation
+      setTimeout(() => {
+        progressBar.style.width = "100%";
+      }, 100);
+    }
+  }
+
+  /**
+   * Play notification sound
+   */
+  function playNotificationSound() {
+    try {
+      const audio = document.getElementById("notificationSound");
+      if (audio) {
+        audio.volume = 0.3;
+        audio.play().catch((e) => {
+          // Silently fail if audio can't be played
+          console.debug("Could not play notification sound:", e.message);
+        });
+      }
+    } catch (error) {
+      console.debug("Notification sound not available");
+    }
+  }
+
+  /**
+   * Check if notification sound is enabled
+   */
+  function isNotificationSoundEnabled() {
+    return localStorage.getItem("notificationSound") !== "false";
+  }
+
+  /**
+   * Escape HTML characters
+   */
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * WebSocket integration for real-time notifications
+   */
+  if (typeof io !== "undefined") {
+    document.addEventListener("DOMContentLoaded", function () {
+      const socket = io();
+
+      // Handle real-time notifications
+      socket.on("notification", function (data) {
+        showToast(data.message, data.type || "info", data.duration || 5000, {
+          title: data.title,
+          playSound: data.playSound !== false,
+          showProgress: data.showProgress !== false,
+        });
+      });
+
+      // Handle flash messages via WebSocket
+      socket.on("flash_message", function (data) {
+        showToast(data.message, data.category || "info", data.duration || 5000);
+      });
+
+      // Handle system alerts
+      socket.on("system_alert", function (data) {
+        showToast(data.message, "warning", 0, {
+          title: "System Alert",
+          playSound: true,
+          allowHtml: true,
+        });
+      });
+    });
+  }
+
+  /**
+   * Global notification utilities
+   */
+  window.notifications = {
+    success: function (message, options = {}) {
+      return showToast(message, "success", options.duration || 4000, options);
+    },
+
+    error: function (message, options = {}) {
+      return showToast(message, "error", options.duration || 0, options);
+    },
+
+    warning: function (message, options = {}) {
+      return showToast(message, "warning", options.duration || 6000, options);
+    },
+
+    info: function (message, options = {}) {
+      return showToast(message, "info", options.duration || 5000, options);
+    },
+
+    clear: function () {
+      const toasts = document.querySelectorAll(".toast.show");
+      toasts.forEach((toast) => {
+        const bsToast = bootstrap.Toast.getInstance(toast);
+        if (bsToast) {
+          bsToast.hide();
+        }
+      });
+    },
+
+    toggleSound: function () {
+      const enabled = !isNotificationSoundEnabled();
+      localStorage.setItem("notificationSound", enabled);
+      showToast(
+        `Notification sound ${enabled ? "enabled" : "disabled"}`,
+        "info",
+        3000,
+        {
+          playSound: false,
+        }
+      );
+      return enabled;
+    },
+  };
+
+  // Backward compatibility
+  window.showNotification = showToast;
+</script>

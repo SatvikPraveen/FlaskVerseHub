@@ -1,0 +1,346 @@
+# File: app/api_hub/docs/openapi.yaml
+
+openapi: 3.0.0
+info:
+  title: FlaskVerseHub API
+  description: Knowledge sharing platform API
+  version: 1.0.0
+  contact:
+    name: FlaskVerseHub Team
+    email: api@flaskversehub.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: /api/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      summary: User login
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+        401:
+          description: Invalid credentials
+
+  /entries:
+    get:
+      summary: List knowledge entries
+      tags: [Knowledge Entries]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/KnowledgeEntry"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+    post:
+      summary: Create knowledge entry
+      tags: [Knowledge Entries]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeEntryCreate"
+      responses:
+        201:
+          description: Entry created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entry:
+                    $ref: "#/components/schemas/KnowledgeEntry"
+                  message:
+                    type: string
+
+  /entries/{id}:
+    get:
+      summary: Get knowledge entry
+      tags: [Knowledge Entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Entry details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entry:
+                    $ref: "#/components/schemas/KnowledgeEntry"
+        404:
+          description: Entry not found
+
+    put:
+      summary: Update knowledge entry
+      tags: [Knowledge Entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeEntryUpdate"
+      responses:
+        200:
+          description: Entry updated
+        403:
+          description: Permission denied
+        404:
+          description: Entry not found
+
+    delete:
+      summary: Delete knowledge entry
+      tags: [Knowledge Entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Entry deleted
+        403:
+          description: Permission denied
+        404:
+          description: Entry not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        is_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    KnowledgeEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+        category:
+          type: string
+        tags:
+          type: string
+        is_public:
+          type: boolean
+        is_featured:
+          type: boolean
+        author:
+          $ref: "#/components/schemas/User"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    KnowledgeEntryCreate:
+      type: object
+      required:
+        - title
+        - content
+        - category
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        content:
+          type: string
+          minLength: 10
+        category:
+          type: string
+          enum:
+            [
+              general,
+              technical,
+              business,
+              research,
+              documentation,
+              tutorial,
+              reference,
+            ]
+        tags:
+          type: string
+          maxLength: 200
+        source_url:
+          type: string
+          format: uri
+        is_public:
+          type: boolean
+          default: false
+        is_featured:
+          type: boolean
+          default: false
+
+    KnowledgeEntryUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        content:
+          type: string
+          minLength: 10
+        category:
+          type: string
+          enum:
+            [
+              general,
+              technical,
+              business,
+              research,
+              documentation,
+              tutorial,
+              reference,
+            ]
+        tags:
+          type: string
+          maxLength: 200
+        source_url:
+          type: string
+          format: uri
+        is_public:
+          type: boolean
+        is_featured:
+          type: boolean
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        pages:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+tags:
+  - name: Authentication
+    description: Authentication endpoints
+  - name: Knowledge Entries
+    description: Knowledge entry operations
+  - name: Users
+    description: User management

@@ -1,0 +1,324 @@
+<!-- File: FlaskVerseHub/app/templates/shared_components/footer.html -->
+<footer class="bg-dark text-light py-5">
+  <div class="container">
+    <div class="row">
+      <!-- About section -->
+      <div class="col-lg-4 col-md-6 mb-4">
+        <div class="footer-section">
+          <h5 class="footer-title d-flex align-items-center mb-3">
+            <img
+              src="{{ url_for('static', filename='images/logo.svg') }}"
+              alt="FlaskVerseHub"
+              width="24"
+              height="24"
+              class="me-2"
+            />
+            FlaskVerseHub
+          </h5>
+          <p class="footer-description text-light-emphasis">
+            A comprehensive Flask application demonstrating modern web
+            development practices, CRUD operations, API development, and
+            real-time features.
+          </p>
+          <div class="social-links d-flex gap-2">
+            <a
+              href="#"
+              class="btn btn-outline-light btn-sm rounded-circle"
+              style="width: 40px; height: 40px"
+              aria-label="GitHub"
+            >
+              <i class="fab fa-github"></i>
+            </a>
+            <a
+              href="#"
+              class="btn btn-outline-light btn-sm rounded-circle"
+              style="width: 40px; height: 40px"
+              aria-label="Twitter"
+            >
+              <i class="fab fa-twitter"></i>
+            </a>
+            <a
+              href="#"
+              class="btn btn-outline-light btn-sm rounded-circle"
+              style="width: 40px; height: 40px"
+              aria-label="LinkedIn"
+            >
+              <i class="fab fa-linkedin"></i>
+            </a>
+            <a
+              href="#"
+              class="btn btn-outline-light btn-sm rounded-circle"
+              style="width: 40px; height: 40px"
+              aria-label="Documentation"
+            >
+              <i class="fas fa-book"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Links -->
+      <div class="col-lg-2 col-md-6 mb-4">
+        <div class="footer-section">
+          <h6 class="footer-subtitle text-white mb-3">Quick Links</h6>
+          <ul class="list-unstyled footer-links">
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.index') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Home</a
+              >
+            </li>
+            {% if current_user.is_authenticated %}
+            <li class="mb-2">
+              <a
+                href="{{ url_for('knowledge_vault.index') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Knowledge Vault</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('dashboard.index') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Dashboard</a
+              >
+            </li>
+            {% else %}
+            <li class="mb-2">
+              <a
+                href="{{ url_for('auth.login') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Login</a
+              >
+            </li>
+            <li class="mb-2">
+              <a href="#" class="text-light-emphasis text-decoration-none"
+                >Register</a
+              >
+            </li>
+            {% endif %}
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.about') }}"
+                class="text-light-emphasis text-decoration-none"
+                >About</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.contact') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Contact</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- API & Docs -->
+      <div class="col-lg-2 col-md-6 mb-4">
+        <div class="footer-section">
+          <h6 class="footer-subtitle text-white mb-3">Developers</h6>
+          <ul class="list-unstyled footer-links">
+            {% if current_user.is_authenticated %}
+            <li class="mb-2">
+              <a href="#" class="text-light-emphasis text-decoration-none"
+                >REST API</a
+              >
+            </li>
+            <li class="mb-2">
+              <a href="#" class="text-light-emphasis text-decoration-none"
+                >GraphQL</a
+              >
+            </li>
+            <li class="mb-2">
+              <a href="#" class="text-light-emphasis text-decoration-none"
+                >API Docs</a
+              >
+            </li>
+            {% endif %}
+            <li class="mb-2">
+              <a
+                href="#"
+                target="_blank"
+                class="text-light-emphasis text-decoration-none"
+                >Documentation</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="https://github.com/your-repo"
+                target="_blank"
+                class="text-light-emphasis text-decoration-none"
+                >GitHub</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.changelog') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Changelog</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Support -->
+      <div class="col-lg-2 col-md-6 mb-4">
+        <div class="footer-section">
+          <h6 class="footer-subtitle text-white mb-3">Support</h6>
+          <ul class="list-unstyled footer-links">
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.help') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Help Center</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.faq') }}"
+                class="text-light-emphasis text-decoration-none"
+                >FAQ</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.privacy') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Privacy Policy</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.terms') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Terms of Service</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.contact') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Contact Us</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Status & Updates -->
+      <div class="col-lg-2 col-md-6 mb-4">
+        <div class="footer-section">
+          <h6 class="footer-subtitle text-white mb-3">Status</h6>
+          <div class="d-flex align-items-center mb-3">
+            <span
+              class="badge bg-success rounded-circle p-1 me-2"
+              style="width: 8px; height: 8px"
+            ></span>
+            <small class="text-light-emphasis">All Systems Operational</small>
+          </div>
+          <ul class="list-unstyled footer-links">
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.status') }}"
+                class="text-light-emphasis text-decoration-none"
+                >System Status</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.updates') }}"
+                class="text-light-emphasis text-decoration-none"
+                >Updates</a
+              >
+            </li>
+            <li class="mb-2">
+              <a
+                href="{{ url_for('main.health') }}"
+                target="_blank"
+                class="text-light-emphasis text-decoration-none"
+                >Health Check</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer bottom -->
+    <hr class="border-light-subtle my-4" />
+    <div class="row align-items-center">
+      <div class="col-md-6">
+        <p class="footer-copyright text-light-emphasis mb-0">
+          &copy; {{ moment().year }} FlaskVerseHub. Built with
+          <i class="fas fa-heart text-danger"></i> using
+          <a
+            href="https://flask.palletsprojects.com"
+            target="_blank"
+            class="text-white text-decoration-none"
+            >Flask</a
+          >.
+        </p>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <div class="footer-meta text-light-emphasis">
+          <span class="version-info"
+            >v{{ config.get('APP_VERSION', '1.0.0') }}</span
+          >
+          <span class="divider mx-1">|</span>
+          <span class="build-info"
+            >Build {{ config.get('BUILD_NUMBER', 'dev') }}</span
+          >
+          {% if current_user.is_authenticated %}
+          <span class="divider mx-1">|</span>
+          <span class="user-info">Welcome, {{ current_user.first_name }}!</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Back to top button -->
+<button
+  type="button"
+  class="btn btn-primary position-fixed bottom-0 end-0 m-4 rounded-circle shadow btn-back-to-top d-none"
+  id="backToTopBtn"
+  title="Back to top"
+  style="width: 50px; height: 50px; z-index: 1000"
+>
+  <i class="fas fa-chevron-up"></i>
+</button>
+
+<script>
+  // Back to top functionality
+  document.addEventListener("DOMContentLoaded", function () {
+    const backToTopBtn = document.getElementById("backToTopBtn");
+
+    // Show/hide button based on scroll position
+    function toggleBackToTop() {
+      if (window.pageYOffset > 300) {
+        backToTopBtn.classList.remove("d-none");
+      } else {
+        backToTopBtn.classList.add("d-none");
+      }
+    }
+
+    // Initial check
+    toggleBackToTop();
+
+    // Listen for scroll events
+    window.addEventListener("scroll", toggleBackToTop);
+
+    // Smooth scroll to top when clicked
+    backToTopBtn.addEventListener("click", function () {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    });
+  });
+</script>
