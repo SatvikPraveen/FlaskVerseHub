@@ -1,0 +1,278 @@
+<!-- File: FlaskVerseHub/app/templates/macros/modal_macros.html -->
+
+{# Base modal structure #} {% macro render_modal(id, title='', size='',
+backdrop=true, keyboard=true, show_close=true) %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  aria-labelledby="{{ id }}-title"
+  aria-hidden="true"
+  data-bs-backdrop="{{ 'static' if not backdrop else 'true' }}"
+  data-bs-keyboard="{{ 'true' if keyboard else 'false' }}"
+>
+  <div class="modal-dialog {% if size %}modal-{{ size }}{% endif %}">
+    <div class="modal-content">
+      {% if title or show_close %}
+      <div class="modal-header">
+        {% if title %}
+        <h5 class="modal-title" id="{{ id }}-title">{{ title }}</h5>
+        {% endif %} {% if show_close %}
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="modal-body">{{ caller() }}</div>
+    </div>
+  </div>
+</div>
+{% endmacro %} {# Modal with footer buttons #} {% macro
+render_modal_with_footer(id, title='', size='', primary_btn='Save',
+secondary_btn='Cancel', show_close=true) %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  aria-labelledby="{{ id }}-title"
+  aria-hidden="true"
+>
+  <div class="modal-dialog {% if size %}modal-{{ size }}{% endif %}">
+    <div class="modal-content">
+      {% if title or show_close %}
+      <div class="modal-header">
+        {% if title %}
+        <h5 class="modal-title" id="{{ id }}-title">{{ title }}</h5>
+        {% endif %} {% if show_close %}
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="modal-body">{{ caller() }}</div>
+
+      <div class="modal-footer">
+        {% if secondary_btn %}
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          {{ secondary_btn }}
+        </button>
+        {% endif %} {% if primary_btn %}
+        <button type="button" class="btn btn-primary modal-primary-action">
+          {{ primary_btn }}
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %} {# Confirmation modal #} {% macro render_confirmation_modal(id,
+title='Confirm Action', message='Are you sure?', confirm_btn='Confirm',
+cancel_btn='Cancel', btn_class='btn-danger') %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  aria-labelledby="{{ id }}-title"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="{{ id }}-title">
+          <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+          {{ title }}
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="confirmation-message">{{ message }}</p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          {{ cancel_btn }}
+        </button>
+        <button type="button" class="btn {{ btn_class }} confirm-action">
+          {{ confirm_btn }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %} {# Delete confirmation modal #} {% macro
+render_delete_modal(id='deleteModal', item_name='item', title='Delete
+Confirmation') %} {{ render_confirmation_modal( id=id, title=title, message='Are
+you sure you want to delete this ' + item_name + '? This action cannot be
+undone.', confirm_btn='Delete', cancel_btn='Cancel', btn_class='btn-danger' ) }}
+{% endmacro %} {# Form modal #} {% macro render_form_modal(id, title='',
+form=none, action='', method='POST', submit_text='Save', size='') %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  aria-labelledby="{{ id }}-title"
+  aria-hidden="true"
+>
+  <div class="modal-dialog {% if size %}modal-{{ size }}{% endif %}">
+    <div class="modal-content">
+      <form action="{{ action }}" method="{{ method }}" class="modal-form">
+        {% if form and form.csrf_token %} {{ form.csrf_token }} {% endif %}
+
+        <div class="modal-header">
+          <h5 class="modal-title" id="{{ id }}-title">{{ title }}</h5>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"
+          ></button>
+        </div>
+
+        <div class="modal-body">{{ caller() }}</div>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            {{ submit_text }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endmacro %} {# Loading modal #} {% macro
+render_loading_modal(id='loadingModal', message='Loading...') %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  data-bs-backdrop="static"
+  data-bs-keyboard="false"
+>
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body text-center py-4">
+        <div class="spinner-border text-primary mb-3" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mb-0">{{ message }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %} {# Image preview modal #} {% macro
+render_image_modal(id='imageModal') %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  aria-labelledby="{{ id }}-title"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="{{ id }}-title">Image Preview</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="{{ id }}-image" src="" alt="Preview" class="img-fluid" />
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %} {# Info/Alert modal #} {% macro render_alert_modal(id,
+title='Information', icon='fas fa-info-circle', icon_color='text-info') %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  aria-labelledby="{{ id }}-title"
+  aria-hidden="true"
+>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="{{ id }}-title">
+          <i class="{{ icon }} {{ icon_color }} me-2"></i>
+          {{ title }}
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">{{ caller() }}</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %} {# Success modal with auto-dismiss #} {% macro
+render_success_modal(id='successModal', title='Success', auto_dismiss=3000) %}
+<div
+  class="modal fade"
+  id="{{ id }}"
+  tabindex="-1"
+  aria-labelledby="{{ id }}-title"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body text-center py-4">
+        <div class="text-success mb-3">
+          <i class="fas fa-check-circle fa-3x"></i>
+        </div>
+        <h5 class="modal-title mb-2">{{ title }}</h5>
+        <div class="success-message">{{ caller() }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if auto_dismiss %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      const modal = document.getElementById('{{ id }}');
+      if (modal) {
+          modal.addEventListener('shown.bs.modal', function() {
+              setTimeout(function() {
+                  bootstrap.Modal.getInstance(modal).hide();
+              }, {{ auto_dismiss }});
+          });
+      }
+  });
+</script>
+{% endif %} {% endmacro %}

@@ -1,0 +1,341 @@
+<!-- File: FlaskVerseHub/app/templates/shared_components/navbar.html -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <!-- Brand/Logo -->
+    <a
+      class="navbar-brand d-flex align-items-center"
+      href="{{ url_for('main.index') }}"
+    >
+      <img
+        src="{{ url_for('static', filename='images/logo.svg') }}"
+        alt="FlaskVerseHub"
+        width="32"
+        height="32"
+        class="me-2"
+      />
+      <span class="fw-bold">FlaskVerseHub</span>
+    </a>
+
+    <!-- Mobile menu toggle -->
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#navbarNav"
+      aria-controls="navbarNav"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Navigation items -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <!-- Main navigation -->
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a
+            class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}"
+            href="{{ url_for('main.index') }}"
+          >
+            <i class="fas fa-home me-1"></i>
+            Home
+          </a>
+        </li>
+
+        {% if current_user.is_authenticated %}
+        <li class="nav-item">
+          <a
+            class="nav-link {% if request.blueprint == 'knowledge_vault' %}active{% endif %}"
+            href="{{ url_for('knowledge_vault.index') }}"
+          >
+            <i class="fas fa-book me-1"></i>
+            Knowledge Vault
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a
+            class="nav-link {% if request.blueprint == 'dashboard' %}active{% endif %}"
+            href="{{ url_for('dashboard.index') }}"
+          >
+            <i class="fas fa-chart-line me-1"></i>
+            Dashboard
+          </a>
+        </li>
+
+        <li class="nav-item dropdown">
+          <a
+            class="nav-link dropdown-toggle {% if request.blueprint == 'api_hub' %}active{% endif %}"
+            href="#"
+            id="apiDropdown"
+            role="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            <i class="fas fa-plug me-1"></i>
+            API Hub
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="apiDropdown">
+            <li>
+              <a class="dropdown-item" href="{{ url_for('api_hub.index') }}">
+                <i class="fas fa-tachometer-alt me-2"></i>
+                API Dashboard
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#">
+                <i class="fas fa-code me-2"></i>
+                REST API
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#">
+                <i class="fas fa-project-diagram me-2"></i>
+                GraphQL API
+              </a>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <a class="dropdown-item" href="#">
+                <i class="fas fa-file-code me-2"></i>
+                API Documentation
+              </a>
+            </li>
+          </ul>
+        </li>
+        {% endif %}
+      </ul>
+
+      <!-- Search form -->
+      {% if current_user.is_authenticated %}
+      <form
+        class="d-flex me-3"
+        role="search"
+        action="{{ url_for('main.search') }}"
+        method="GET"
+      >
+        <div class="input-group">
+          <input
+            class="form-control form-control-sm"
+            type="search"
+            name="q"
+            placeholder="Search knowledge..."
+            aria-label="Search"
+            value="{{ request.args.get('q', '') }}"
+          />
+          <button class="btn btn-outline-light btn-sm" type="submit">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </form>
+      {% endif %}
+
+      <!-- User menu -->
+      <ul class="navbar-nav">
+        {% if current_user.is_authenticated %}
+        <!-- Notifications -->
+        <li class="nav-item dropdown">
+          <a
+            class="nav-link position-relative"
+            href="#"
+            id="notificationsDropdown"
+            role="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            <i class="fas fa-bell"></i>
+            <span
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge d-none"
+            >
+              3
+            </span>
+          </a>
+          <ul
+            class="dropdown-menu dropdown-menu-end notifications-dropdown"
+            aria-labelledby="notificationsDropdown"
+          >
+            <li class="dropdown-header">
+              <i class="fas fa-bell me-2"></i>
+              Notifications
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <a class="dropdown-item notification-item" href="#">
+                <div class="d-flex">
+                  <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-info"></i>
+                  </div>
+                  <div class="flex-grow-1 ms-2">
+                    <h6 class="dropdown-item-title mb-1">
+                      Welcome to FlaskVerseHub
+                    </h6>
+                    <p class="dropdown-item-text text-muted small mb-0">
+                      Get started by exploring the knowledge vault.
+                    </p>
+                    <small class="text-muted">2 minutes ago</small>
+                  </div>
+                </div>
+              </a>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <a class="dropdown-item text-center" href="#">
+                View all notifications
+              </a>
+            </li>
+          </ul>
+        </li>
+
+        <!-- User dropdown -->
+        <li class="nav-item dropdown">
+          <a
+            class="nav-link dropdown-toggle d-flex align-items-center"
+            href="#"
+            id="userDropdown"
+            role="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            <i class="fas fa-user-circle me-1"></i>
+            <span>{{ current_user.username }}</span>
+          </a>
+          <ul
+            class="dropdown-menu dropdown-menu-end"
+            aria-labelledby="userDropdown"
+          >
+            <li class="dropdown-header">
+              <div class="text-center">
+                <div class="fw-bold">
+                  {{ current_user.first_name }} {{ current_user.last_name }}
+                </div>
+                <small class="text-muted">{{ current_user.email }}</small>
+              </div>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <a class="dropdown-item" href="#">
+                <i class="fas fa-user-edit me-2"></i>
+                Edit Profile
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#">
+                <i class="fas fa-cog me-2"></i>
+                Settings
+              </a>
+            </li>
+            {% if current_user.is_admin %}
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <a class="dropdown-item" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                Admin Panel
+              </a>
+            </li>
+            {% endif %}
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <a class="dropdown-item" href="{{ url_for('auth.logout') }}">
+                <i class="fas fa-sign-out-alt me-2"></i>
+                Logout
+              </a>
+            </li>
+          </ul>
+        </li>
+        {% else %}
+        <!-- Guest user links -->
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.login') }}">
+            <i class="fas fa-sign-in-alt me-1"></i>
+            Login
+          </a>
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link btn btn-outline-light btn-sm ms-2"
+            href="#"
+            role="button"
+          >
+            <i class="fas fa-user-plus me-1"></i>
+            Register
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Mobile search (shown on smaller screens) -->
+{% if current_user.is_authenticated %}
+<div class="mobile-search d-lg-none bg-light border-bottom">
+  <div class="container-fluid py-2">
+    <form role="search" action="{{ url_for('main.search') }}" method="GET">
+      <div class="input-group input-group-sm">
+        <input
+          class="form-control"
+          type="search"
+          name="q"
+          placeholder="Search knowledge..."
+          aria-label="Search"
+          value="{{ request.args.get('q', '') }}"
+        />
+        <button class="btn btn-primary" type="submit">
+          <i class="fas fa-search"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  // Navbar dropdown behavior
+  document.addEventListener("DOMContentLoaded", function () {
+    // Close dropdowns when clicking outside
+    document.addEventListener("click", function (event) {
+      const dropdowns = document.querySelectorAll(
+        ".navbar .dropdown-menu.show"
+      );
+      dropdowns.forEach((dropdown) => {
+        if (!dropdown.closest(".dropdown").contains(event.target)) {
+          dropdown.classList.remove("show");
+        }
+      });
+    });
+
+    // Auto-hide mobile navbar after clicking a link
+    const navbarCollapse = document.getElementById("navbarNav");
+    const navLinks = navbarCollapse.querySelectorAll(
+      ".nav-link:not(.dropdown-toggle)"
+    );
+
+    navLinks.forEach((link) => {
+      link.addEventListener("click", function () {
+        if (
+          window.getComputedStyle(document.querySelector(".navbar-toggler"))
+            .display !== "none"
+        ) {
+          new bootstrap.Collapse(navbarCollapse).hide();
+        }
+      });
+    });
+
+    // Update notification badge
+    function updateNotificationBadge(count) {
+      const badge = document.querySelector(".notification-badge");
+      if (badge) {
+        if (count > 0) {
+          badge.textContent = count;
+          badge.classList.remove("d-none");
+        } else {
+          badge.classList.add("d-none");
+        }
+      }
+    }
+
+    // Initialize with 0 notifications
+    updateNotificationBadge(0);
+  });
+</script>

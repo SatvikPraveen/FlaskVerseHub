@@ -1,0 +1,93 @@
+<!-- File: FlaskVerseHub/app/templates/layout.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="layout-wrapper">
+    <!-- Page Header Section -->
+    {% block page_header %}
+    <section class="page-header bg-primary text-white py-4">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    {% block page_title %}
+                    <h1 class="page-title mb-2">{% block heading %}Page Title{% endblock %}</h1>
+                    {% endblock %}
+                    
+                    {% block page_description %}
+                    {% if self.description() %}
+                    <p class="page-description mb-0">{% block description %}{% endblock %}</p>
+                    {% endif %}
+                    {% endblock %}
+                </div>
+                
+                <div class="col-md-4 text-md-end">
+                    {% block page_actions %}
+                    <div class="page-actions">
+                        {% block actions %}{% endblock %}
+                    </div>
+                    {% endblock %}
+                </div>
+            </div>
+            
+            {% block breadcrumbs %}
+            {% if breadcrumbs %}
+            <nav aria-label="breadcrumb" class="mt-3">
+                <ol class="breadcrumb mb-0">
+                    {% for breadcrumb in breadcrumbs %}
+                    <li class="breadcrumb-item {% if loop.last %}active{% endif %}">
+                        {% if not loop.last and breadcrumb.url %}
+                        <a href="{{ breadcrumb.url }}" class="text-white-50">{{ breadcrumb.title }}</a>
+                        {% else %}
+                        <span class="text-white">{{ breadcrumb.title }}</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ol>
+            </nav>
+            {% endif %}
+            {% endblock %}
+        </div>
+    </section>
+    {% endblock %}
+
+    <!-- Main Content Section -->
+    <section class="main-section py-4">
+        <div class="container">
+            <div class="row">
+                <!-- Sidebar -->
+                {% block sidebar %}
+                {% if show_sidebar %}
+                <div class="col-lg-3 col-xl-2 mb-4">
+                    <aside class="content-sidebar">
+                        {% if request.blueprint == 'dashboard' %}
+                            {% include 'shared_components/sidebar.html' %}
+                        {% else %}
+                            {% block sidebar_content %}{% endblock %}
+                        {% endif %}
+                    </aside>
+                </div>
+                <div class="col-lg-9 col-xl-10">
+                {% else %}
+                <div class="col-12">
+                {% endif %}
+                {% endblock %}
+
+                <!-- Main Content -->
+                {% block main_content %}
+                <div class="content-body">
+                    {% block body %}{% endblock %}
+                </div>
+                {% endblock %}
+                
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Additional Sections -->
+    {% block additional_sections %}{% endblock %}
+</div>
+
+<!-- Page-specific modals -->
+{% block page_modals %}{% endblock %}
+{% endblock %}

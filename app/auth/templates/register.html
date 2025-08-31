@@ -1,0 +1,357 @@
+<!-- File: app/auth/templates/register.html -->
+{% extends "base.html" %} {% from "macros/form_macros.html" import render_field
+%} {% block title %}Register - FlaskVerseHub{% endblock %} {% block extra_css %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='css/auth.css') }}"
+/>
+<style>
+  .password-strength {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .strength-meter {
+    height: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+  }
+
+  .strength-bar {
+    height: 100%;
+    transition: width 0.3s, background-color 0.3s;
+    border-radius: 2px;
+  }
+
+  .strength-weak {
+    background: #dc3545;
+    width: 25%;
+  }
+  .strength-fair {
+    background: #fd7e14;
+    width: 50%;
+  }
+  .strength-good {
+    background: #ffc107;
+    width: 75%;
+  }
+  .strength-strong {
+    background: #28a745;
+    width: 100%;
+  }
+
+  .requirements-list {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #6c757d;
+  }
+
+  .requirements-list li {
+    margin: 0.25rem 0;
+    position: relative;
+    padding-left: 1.5rem;
+  }
+
+  .requirements-list li::before {
+    content: "×";
+    position: absolute;
+    left: 0;
+    color: #dc3545;
+    font-weight: bold;
+  }
+
+  .requirements-list li.met::before {
+    content: "✓";
+    color: #28a745;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h1>FlaskVerseHub</h1>
+      <p>Create your account</p>
+    </div>
+
+    <form method="POST" class="auth-form" id="registerForm">
+      {{ form.hidden_tag() }}
+
+      <div class="form-row">
+        <div class="form-group half-width">
+          {{ form.first_name.label(class="form-label") }} {{
+          form.first_name(class="form-control") }} {% if form.first_name.errors
+          %}
+          <div class="error-list">
+            <ul>
+              {% for error in form.first_name.errors %}
+              <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="form-group half-width">
+          {{ form.last_name.label(class="form-label") }} {{
+          form.last_name(class="form-control") }} {% if form.last_name.errors %}
+          <div class="error-list">
+            <ul>
+              {% for error in form.last_name.errors %}
+              <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        {{ form.username.label(class="form-label") }} {{
+        form.username(class="form-control", id="username") }} {% if
+        form.username.errors %}
+        <div class="error-list">
+          <ul>
+            {% for error in form.username.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <div class="username-status" id="usernameStatus"></div>
+      </div>
+
+      <div class="form-group">
+        {{ form.email.label(class="form-label") }} {{
+        form.email(class="form-control", id="email") }} {% if form.email.errors
+        %}
+        <div class="error-list">
+          <ul>
+            {% for error in form.email.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <div class="email-status" id="emailStatus"></div>
+      </div>
+
+      <div class="form-group">
+        {{ form.password.label(class="form-label") }} {{
+        form.password(class="form-control", id="password") }} {% if
+        form.password.errors %}
+        <div class="error-list">
+          <ul>
+            {% for error in form.password.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <div class="password-strength">
+          <div class="strength-meter">
+            <div class="strength-bar" id="strengthBar"></div>
+          </div>
+          <div class="strength-text" id="strengthText"></div>
+        </div>
+
+        <ul class="requirements-list" id="passwordRequirements">
+          <li data-requirement="length">At least 8 characters</li>
+          <li data-requirement="lowercase">One lowercase letter</li>
+          <li data-requirement="uppercase">One uppercase letter</li>
+          <li data-requirement="number">One number</li>
+          <li data-requirement="special">One special character</li>
+        </ul>
+      </div>
+
+      <div class="form-group">
+        {{ form.confirm_password.label(class="form-label") }} {{
+        form.confirm_password(class="form-control", id="confirmPassword") }} {%
+        if form.confirm_password.errors %}
+        <div class="error-list">
+          <ul>
+            {% for error in form.confirm_password.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <div class="password-match" id="passwordMatch"></div>
+      </div>
+
+      <div class="checkbox-group">
+        {{ form.agree_terms(class="form-check-input", required=True) }} {{
+        form.agree_terms.label(class="form-check-label") }} {% if
+        form.agree_terms.errors %}
+        <div class="error-list">
+          <ul>
+            {% for error in form.agree_terms.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+        Create Account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <p>
+        Already have an account?
+        <a href="{{ url_for('auth.login') }}">Sign in here</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const passwordInput = document.getElementById("password");
+    const confirmPasswordInput = document.getElementById("confirmPassword");
+    const usernameInput = document.getElementById("username");
+    const emailInput = document.getElementById("email");
+    const agreeTerms = document.querySelector('input[name="agree_terms"]');
+    const submitBtn = document.getElementById("submitBtn");
+
+    // Password strength checking
+    passwordInput.addEventListener("input", function () {
+      checkPasswordStrength(this.value);
+      checkPasswordMatch();
+      updateSubmitButton();
+    });
+
+    confirmPasswordInput.addEventListener("input", function () {
+      checkPasswordMatch();
+      updateSubmitButton();
+    });
+
+    agreeTerms.addEventListener("change", updateSubmitButton);
+
+    function checkPasswordStrength(password) {
+      const requirements = {
+        length: password.length >= 8,
+        lowercase: /[a-z]/.test(password),
+        uppercase: /[A-Z]/.test(password),
+        number: /\d/.test(password),
+        special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+      };
+
+      // Update requirement indicators
+      Object.keys(requirements).forEach((req) => {
+        const element = document.querySelector(`[data-requirement="${req}"]`);
+        if (element) {
+          element.classList.toggle("met", requirements[req]);
+        }
+      });
+
+      // Calculate strength
+      const metRequirements =
+        Object.values(requirements).filter(Boolean).length;
+      let strength = "weak";
+      let strengthClass = "strength-weak";
+
+      if (metRequirements >= 5) {
+        strength = "strong";
+        strengthClass = "strength-strong";
+      } else if (metRequirements >= 4) {
+        strength = "good";
+        strengthClass = "strength-good";
+      } else if (metRequirements >= 2) {
+        strength = "fair";
+        strengthClass = "strength-fair";
+      }
+
+      const strengthBar = document.getElementById("strengthBar");
+      const strengthText = document.getElementById("strengthText");
+
+      strengthBar.className = `strength-bar ${strengthClass}`;
+      strengthText.textContent = `Password strength: ${strength}`;
+
+      return metRequirements >= 5;
+    }
+
+    function checkPasswordMatch() {
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+      const matchDiv = document.getElementById("passwordMatch");
+
+      if (confirmPassword.length === 0) {
+        matchDiv.textContent = "";
+        return false;
+      }
+
+      const matches = password === confirmPassword;
+      matchDiv.textContent = matches
+        ? "✓ Passwords match"
+        : "× Passwords do not match";
+      matchDiv.style.color = matches ? "#28a745" : "#dc3545";
+      matchDiv.style.fontSize = "0.875rem";
+
+      return matches;
+    }
+
+    function updateSubmitButton() {
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+      const username = usernameInput.value;
+      const email = emailInput.value;
+      const termsAgreed = agreeTerms.checked;
+
+      const passwordStrong = checkPasswordStrength(password);
+      const passwordsMatch = checkPasswordMatch();
+
+      const allValid =
+        username.length >= 3 &&
+        email.includes("@") &&
+        passwordStrong &&
+        passwordsMatch &&
+        termsAgreed;
+
+      submitBtn.disabled = !allValid;
+      submitBtn.style.opacity = allValid ? "1" : "0.6";
+    }
+
+    // Real-time username availability check
+    let usernameTimeout;
+    usernameInput.addEventListener("input", function () {
+      clearTimeout(usernameTimeout);
+      const username = this.value;
+
+      if (username.length < 3) return;
+
+      usernameTimeout = setTimeout(() => {
+        checkUsernameAvailability(username);
+      }, 500);
+    });
+
+    function checkUsernameAvailability(username) {
+      const statusDiv = document.getElementById("usernameStatus");
+      statusDiv.textContent = "Checking...";
+      statusDiv.style.color = "#6c757d";
+
+      // Simulate API call (replace with actual endpoint)
+      setTimeout(() => {
+        const available = !["admin", "test", "user"].includes(
+          username.toLowerCase()
+        );
+        statusDiv.textContent = available
+          ? "✓ Username available"
+          : "× Username taken";
+        statusDiv.style.color = available ? "#28a745" : "#dc3545";
+      }, 300);
+    }
+
+    // Form submission
+    const form = document.getElementById("registerForm");
+    form.addEventListener("submit", function () {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating Account...";
+    });
+  });
+</script>
+{% endblock %}

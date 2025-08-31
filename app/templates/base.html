@@ -1,0 +1,114 @@
+<!-- File: FlaskVerseHub/app/templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="{% block meta_description %}FlaskVerseHub - Comprehensive Flask Application Hub{% endblock %}"
+    />
+    <meta
+      name="keywords"
+      content="{% block meta_keywords %}Flask, Python, Web Development, CRUD, API, Real-time{% endblock %}"
+    />
+    <meta name="author" content="FlaskVerseHub" />
+    <meta name="csrf-token" content="{{ csrf_token() }}" />
+
+    <title>{% block title %}FlaskVerseHub{% endblock %}</title>
+
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ url_for('static', filename='images/logo.svg') }}"
+    />
+
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- CSS Stylesheets -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/base.css') }}"
+    />
+    {% block styles %}{% endblock %}
+  </head>
+  <body class="{% block body_class %}{% endblock %}">
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="loading-spinner d-none">
+      <div class="spinner-content">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading...</p>
+      </div>
+    </div>
+
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Page Header -->
+    {% block header %}
+    <header class="main-header">
+      {% include 'shared_components/navbar.html' %}
+    </header>
+    {% endblock %}
+
+    <!-- Flash Messages -->
+    {% include 'shared_components/flash_messages.html' %}
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Page Footer -->
+    {% block footer %}
+    <footer class="main-footer">
+      {% include 'shared_components/footer.html' %}
+    </footer>
+    {% endblock %}
+
+    <!-- Modals Container -->
+    <div id="modals-container">{% block modals %}{% endblock %}</div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+
+    <!-- Global JavaScript Variables -->
+    <script>
+      window.FlaskVerseHub = {
+          csrf_token: {{ csrf_token()|tojson }},
+          user: {% if current_user.is_authenticated %}{{ current_user.to_dict()|tojson }}{% else %}null{% endif %},
+          urls: {
+              api_base: {{ url_for("api_hub.index")|tojson }},
+              dashboard: {{ url_for("dashboard.index")|tojson }},
+              auth_login: {{ url_for("auth.login")|tojson }},
+              auth_logout: {{ url_for("auth.logout")|tojson }}
+          }
+      };
+    </script>
+  </body>
+</html>

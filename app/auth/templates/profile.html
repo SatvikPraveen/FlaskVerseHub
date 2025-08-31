@@ -1,0 +1,298 @@
+<!-- File: app/auth/templates/profile.html -->
+{% extends "base.html" %} {% from "macros/form_macros.html" import render_field
+%} {% block title %}Profile - FlaskVerseHub{% endblock %} {% block extra_css %}
+<style>
+  .profile-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .profile-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+
+  .profile-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1rem;
+  }
+
+  .profile-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  .profile-tabs {
+    display: flex;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 2rem;
+  }
+
+  .tab-button {
+    background: none;
+    border: none;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s;
+  }
+
+  .tab-button.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+  }
+
+  .tab-content {
+    display: none;
+  }
+
+  .tab-content.active {
+    display: block;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .form-group.half-width {
+    flex: 0 0 calc(50% - 0.5rem);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #667eea;
+  }
+
+  .stat-label {
+    color: #6c757d;
+    margin-top: 0.5rem;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="profile-container">
+  <div class="profile-header">
+    <div class="profile-avatar">{{ current_user.username[0].upper() }}</div>
+    <h1>{{ current_user.full_name or current_user.username }}</h1>
+    <p>{{ current_user.email }}</p>
+    <small>Member since {{ current_user.created_at.strftime('%B %Y') }}</small>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-number">
+        {{ current_user.knowledge_entries.count() }}
+      </div>
+      <div class="stat-label">Total Entries</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">
+        {{ current_user.knowledge_entries.filter_by(is_public=True).count() }}
+      </div>
+      <div class="stat-label">Public Entries</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">
+        {{ current_user.knowledge_entries.filter_by(is_featured=True).count() }}
+      </div>
+      <div class="stat-label">Featured Entries</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">
+        {{ current_user.last_login.strftime('%m/%d/%Y') if
+        current_user.last_login else 'Never' }}
+      </div>
+      <div class="stat-label">Last Login</div>
+    </div>
+  </div>
+
+  <div class="profile-card">
+    <div class="profile-tabs">
+      <button class="tab-button active" onclick="switchTab('profile')">
+        Profile
+      </button>
+      <button class="tab-button" onclick="switchTab('security')">
+        Security
+      </button>
+      <button class="tab-button" onclick="switchTab('preferences')">
+        Preferences
+      </button>
+    </div>
+
+    <!-- Profile Tab -->
+    <div id="profile-tab" class="tab-content active">
+      <form method="POST" class="profile-form">
+        {{ form.hidden_tag() }}
+
+        <div class="form-row">
+          <div class="form-group half-width">
+            {{ render_field(form.first_name, class="form-control") }}
+          </div>
+          <div class="form-group half-width">
+            {{ render_field(form.last_name, class="form-control") }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          {{ render_field(form.username, class="form-control") }}
+        </div>
+
+        <div class="form-group">
+          {{ render_field(form.email, class="form-control") }}
+        </div>
+
+        <div class="form-group">
+          {{ render_field(form.bio, class="form-control", rows="4") }}
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Update Profile</button>
+          <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary"
+            >Cancel</a
+          >
+        </div>
+      </form>
+    </div>
+
+    <!-- Security Tab -->
+    <div id="security-tab" class="tab-content">
+      <div class="security-section">
+        <h4>Change Password</h4>
+        <p>Keep your account secure with a strong password.</p>
+        <a href="{{ url_for('auth.change_password') }}" class="btn btn-outline"
+          >Change Password</a
+        >
+      </div>
+
+      <div class="security-section">
+        <h4>Login History</h4>
+        <p>Monitor your recent login activity.</p>
+        <div class="login-history">
+          <div class="history-item">
+            <div class="history-info">
+              <strong>Current Session</strong>
+              <small
+                >{{ request.environ.get('REMOTE_ADDR') }} - {{
+                moment().format('lll') }}</small
+              >
+            </div>
+            <span class="status active">Active</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="security-section">
+        <h4>Two-Factor Authentication</h4>
+        <p>Add an extra layer of security to your account.</p>
+        <button class="btn btn-outline" disabled>
+          Enable 2FA (Coming Soon)
+        </button>
+      </div>
+    </div>
+
+    <!-- Preferences Tab -->
+    <div id="preferences-tab" class="tab-content">
+      <div class="preferences-section">
+        <h4>Notification Preferences</h4>
+        <div class="preference-group">
+          <label class="preference-item">
+            <input type="checkbox" {{ 'checked' if
+            current_user.email_notifications }}>
+            <span>Email notifications for new comments</span>
+          </label>
+          <label class="preference-item">
+            <input type="checkbox" {{ 'checked' if current_user.marketing_emails
+            }}>
+            <span>Marketing emails and updates</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="preferences-section">
+        <h4>Privacy Settings</h4>
+        <div class="preference-group">
+          <label class="preference-item">
+            <input type="checkbox" {{ 'checked' if current_user.public_profile
+            }}>
+            <span>Make profile public</span>
+          </label>
+          <label class="preference-item">
+            <input type="checkbox" {{ 'checked' if current_user.show_email }}>
+            <span>Show email on profile</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="preferences-section">
+        <h4>Account Actions</h4>
+        <p>Permanently delete your account and all associated data.</p>
+        <a href="{{ url_for('auth.delete_account') }}" class="btn btn-danger"
+          >Delete Account</a
+        >
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  function switchTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll(".tab-content").forEach((tab) => {
+      tab.classList.remove("active");
+    });
+
+    // Remove active class from all buttons
+    document.querySelectorAll(".tab-button").forEach((btn) => {
+      btn.classList.remove("active");
+    });
+
+    // Show selected tab
+    document.getElementById(tabName + "-tab").classList.add("active");
+    event.target.classList.add("active");
+  }
+
+  // Form validation
+  document.addEventListener("DOMContentLoaded", function () {
+    const form = document.querySelector(".profile-form");
+    if (form) {
+      form.addEventListener("submit", function () {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Updating...";
+      });
+    }
+  });
+</script>
+{% endblock %}
