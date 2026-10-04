@@ -1,10 +1,5 @@
-"""
-Error Handling Blueprint
-Demonstrates Flask error handling and custom error pages
-"""
-from flask import Blueprint
+"""Uniform error handling: JSON for API clients, HTML for browsers."""
 
-bp = Blueprint('errors', __name__, 
-               template_folder='templates')
+from app.errors.handlers import APIError, register_error_handlers
 
-from app.errors import handlers
+__all__ = ["APIError", "register_error_handlers"]

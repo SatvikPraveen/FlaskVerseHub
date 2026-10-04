@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+{% block title %}Tags · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3 mb-3">Tags</h1>
+  <div class="d-flex flex-wrap gap-2">
+    {% for tag in page.items %}
+      <a class="badge text-bg-light border fs-6 text-decoration-none" href="{{ url_for('knowledge_vault.index', tag=tag.slug) if 'knowledge_vault.index' in url_map_endpoints else '#' }}">#{{ tag.name }} <span class="text-muted">{{ tag.usage_count }}</span></a>
+    {% else %}
+      <p class="text-muted">No tags yet.</p>
+    {% endfor %}
+  </div>
+  {{ render_pagination(page, 'main.tags') }}
+</div>
+{% endblock %}

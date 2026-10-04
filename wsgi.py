@@ -1,13 +1,9 @@
-# File: FlaskVerseHub/wsgi.py
+"""WSGI entry point. ``gunicorn -k gevent -w 1 wsgi:app`` or ``flask --app wsgi run``."""
 
-import os
 from app import create_app
+from app.extensions import socketio
 
-# Get configuration from environment
-config_name = os.getenv('FLASK_CONFIG', 'production')
+app = create_app()
 
-# Create application instance
-application = create_app(config_name)
-
-if __name__ == "__main__":
-    application.run()
+if __name__ == "__main__":  # pragma: no cover
+    socketio.run(app, host="0.0.0.0", port=5000, debug=app.debug)  # noqa: S104

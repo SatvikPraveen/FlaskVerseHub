@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Status · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 760px">
+  <h1 class="h3 mb-4"><span class="status-dot status-online me-2"></span>System status</h1>
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card h-100"><div class="card-header fw-semibold">Runtime</div>
+        <table class="table table-sm mb-0">
+          {% for key, value in info.items() %}<tr><th class="text-muted fw-normal text-capitalize">{{ key.replace('_', ' ') }}</th><td class="text-end"><code>{{ value }}</code></td></tr>{% endfor %}
+        </table>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100"><div class="card-header fw-semibold">Content</div>
+        <table class="table table-sm mb-0">
+          {% for key, value in counts.items() %}<tr><th class="text-muted fw-normal text-capitalize">{{ key }}</th><td class="text-end fw-semibold">{{ value }}</td></tr>{% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+  <p class="small text-muted mt-4">Machine-readable probe: <a href="{{ url_for('main.health') }}"><code>GET /health</code></a>{% if config.METRICS_ENABLED %} · Prometheus: <code>GET /metrics</code>{% endif %}</p>
+</div>
+{% endblock %}

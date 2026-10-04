@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ status }} · {{ title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-5 text-center error-page">
+  <p class="display-1 fw-bold text-primary mb-0">{{ status }}</p>
+  <h1 class="h3 mb-3">{{ title }}</h1>
+  <p class="text-muted mb-4">{{ message }}</p>
+  <div class="d-flex justify-content-center gap-2">
+    <a class="btn btn-primary" href="{{ url_for('main.index') }}"><i class="fa-solid fa-house me-1"></i>Go home</a>
+    <a class="btn btn-outline-secondary" href="javascript:history.back()">Go back</a>
+  </div>
+  {% if request_id %}<p class="small text-muted mt-4">Request ID: <code>{{ request_id }}</code></p>{% endif %}
+</div>
+{% endblock %}

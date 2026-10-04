@@ -1,135 +1,83 @@
-<!-- File: FlaskVerseHub/app/templates/main/index.html -->
-{% extends "base.html" %} {% block title %}FlaskVerseHub - Home{% endblock %} {%
-block content %}
-<div class="container">
-  <div class="hero-section">
-    <h1 class="display-4">Welcome to FlaskVerseHub</h1>
-    <p class="lead">
-      A comprehensive Flask application demonstrating modern web development
-      practices.
-    </p>
-
-    <div class="mt-4">
-      {% if current_user.is_authenticated %}
-      <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary btn-lg"
-        >Go to Dashboard</a
-      >
-      <a
-        href="{{ url_for('knowledge_vault.index') }}"
-        class="btn btn-outline-primary btn-lg"
-        >Knowledge Vault</a
-      >
-      {% else %}
-      <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg"
-        >Get Started</a
-      >
-      <a href="#features" class="btn btn-outline-primary btn-lg">Learn More</a>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Features Section -->
-  <div id="features" class="features-section mt-5">
-    <div class="row">
-      <div class="col-md-4 mb-4">
-        <div class="card h-100">
-          <div class="card-body text-center">
-            <i class="fas fa-book fa-3x text-primary mb-3"></i>
-            <h5 class="card-title">Knowledge Management</h5>
-            <p class="card-text">
-              Organize and manage your knowledge with our comprehensive CRUD
-              system.
-            </p>
-          </div>
+{% extends "base.html" %}
+{% from "macros/items.html" import item_card %}
+{% block content %}
+<section class="hero py-5 bg-body-tertiary border-bottom">
+  <div class="container">
+    <div class="row align-items-center gy-4">
+      <div class="col-lg-7">
+        <span class="badge text-bg-primary mb-2">v{{ app_version }}</span>
+        <h1 class="display-5 fw-bold">Master Flask through one research-grade codebase.</h1>
+        <p class="lead text-muted">
+          {{ app_name }} is a knowledge platform that doubles as a reference implementation:
+          typed SQLAlchemy models, REST and GraphQL APIs, real-time events, observability, and a
+          reproducible information-retrieval benchmark, all with tests you can read.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if 'knowledge_vault.index' in url_map_endpoints %}
+          <a class="btn btn-primary btn-lg" href="{{ url_for('knowledge_vault.index') }}"><i class="fa-solid fa-book me-2"></i>Browse the vault</a>
+          {% endif %}
+          {% if 'api_hub.docs' in url_map_endpoints %}
+          <a class="btn btn-outline-primary btn-lg" href="{{ url_for('api_hub.docs') }}"><i class="fa-solid fa-plug me-2"></i>API reference</a>
+          {% endif %}
         </div>
       </div>
-      <div class="col-md-4 mb-4">
-        <div class="card h-100">
-          <div class="card-body text-center">
-            <i class="fas fa-plug fa-3x text-success mb-3"></i>
-            <h5 class="card-title">API Hub</h5>
-            <p class="card-text">
-              RESTful and GraphQL APIs with comprehensive documentation.
-            </p>
+      <div class="col-lg-5">
+        <div class="row g-3">
+          {% for label, value, icon in [('Knowledge items', stats['items'], 'fa-file-lines'), ('Contributors', stats['users'], 'fa-users'), ('Categories', stats['categories'], 'fa-folder-tree'), ('Tags', stats['tags'], 'fa-tags')] %}
+          <div class="col-6">
+            <div class="card stat-card h-100">
+              <div class="card-body">
+                <i class="fa-solid {{ icon }} text-primary mb-2" aria-hidden="true"></i>
+                <div class="fs-3 fw-bold">{{ value }}</div>
+                <div class="small text-muted">{{ label }}</div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div class="col-md-4 mb-4">
-        <div class="card h-100">
-          <div class="card-body text-center">
-            <i class="fas fa-chart-dashboard fa-3x text-info mb-3"></i>
-            <h5 class="card-title">Real-time Dashboard</h5>
-            <p class="card-text">
-              Live analytics and monitoring with WebSocket integration.
-            </p>
-          </div>
+          {% endfor %}
         </div>
       </div>
     </div>
   </div>
+</section>
 
-  <!-- Stats Section -->
-  {% if stats %}
-  <div class="stats-section mt-5">
-    <h2 class="text-center mb-4">Platform Statistics</h2>
-    <div class="row text-center">
-      <div class="col-md-3 mb-3">
-        <div class="stat-card">
-          <h3 class="text-primary">{{ stats.total_items }}</h3>
-          <p>Knowledge Items</p>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="stat-card">
-          <h3 class="text-success">{{ stats.total_users }}</h3>
-          <p>Active Users</p>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="stat-card">
-          <h3 class="text-info">{{ stats.total_categories }}</h3>
-          <p>Categories</p>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="stat-card">
-          <h3 class="text-warning">{{ stats.total_views }}</h3>
-          <p>Total Views</p>
-        </div>
-      </div>
-    </div>
+<section class="container py-5">
+  {% if featured %}
+  <div class="d-flex justify-content-between align-items-end mb-3">
+    <h2 class="h4 mb-0"><i class="fa-solid fa-star text-warning me-2"></i>Featured</h2>
+  </div>
+  <div class="row g-3 mb-5">
+    {% for item in featured %}<div class="col-md-6 col-lg-4">{{ item_card(item) }}</div>{% endfor %}
   </div>
   {% endif %}
-</div>
-{% endblock %} {% block styles %}
-<style>
-  .hero-section {
-    text-align: center;
-    padding: 4rem 0;
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-    color: white;
-    border-radius: 1rem;
-    margin: 2rem 0;
-  }
 
-  .features-section {
-    padding: 2rem 0;
-  }
-
-  .stats-section {
-    padding: 2rem 0;
-    background-color: #f8f9fa;
-    border-radius: 1rem;
-  }
-
-  .stat-card {
-    padding: 1rem;
-  }
-
-  .stat-card h3 {
-    font-size: 2.5rem;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-  }
-</style>
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <h2 class="h4 mb-3"><i class="fa-regular fa-clock me-2"></i>Recently updated</h2>
+      {% if recent %}
+      <div class="row g-3">
+        {% for item in recent %}<div class="col-md-6">{{ item_card(item) }}</div>{% endfor %}
+      </div>
+      {% else %}
+      <div class="card"><div class="card-body text-center text-muted py-5">
+        <i class="fa-regular fa-folder-open fa-2x mb-3 d-block"></i>
+        No items yet. Run <code>flask seed all</code> to load demonstration data.
+      </div></div>
+      {% endif %}
+    </div>
+    <div class="col-lg-4">
+      <h2 class="h4 mb-3"><i class="fa-solid fa-folder-tree me-2"></i>Categories</h2>
+      <div class="list-group">
+        {% for category in categories %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+           href="{{ url_for('knowledge_vault.index', category=category.slug) if 'knowledge_vault.index' in url_map_endpoints else '#' }}">
+          <span><span class="d-inline-block rounded-circle me-2" style="width:.6rem;height:.6rem;background:{{ category.color }}"></span>{{ category.name }}</span>
+          <span class="badge text-bg-light border">{{ category.item_count }}</span>
+        </a>
+        {% else %}
+        <div class="list-group-item text-muted">No categories yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
 {% endblock %}

@@ -1,19 +1,14 @@
-# File: app/cli/__init__.py
-# 🖥️ CLI Group Registration
+"""Custom ``flask`` sub-commands: ``seed``, ``users`` and ``search``."""
 
-import click
-from flask.cli import with_appcontext
+from flask import Flask
 
-
-@click.group()
-def cli():
-    """FlaskVerseHub CLI commands."""
-    pass
+from app.cli.seed import seed_cli
+from app.cli.users import users_cli
 
 
-# Import command groups
-from . import db_commands, user_commands
+def register_cli(app: Flask) -> None:
+    app.cli.add_command(seed_cli)
+    app.cli.add_command(users_cli)
 
-# Register command groups
-cli.add_command(db_commands.db)
-cli.add_command(user_commands.user)
+
+__all__ = ["register_cli"]

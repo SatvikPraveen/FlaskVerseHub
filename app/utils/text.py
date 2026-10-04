@@ -74,8 +74,10 @@ def excerpt(value: str | None, *, length: int = 200, suffix: str = "…") -> str
     text = strip_html(value)
     if len(text) <= length:
         return text
-    cut = text[:length].rsplit(" ", 1)[0]
-    return f"{cut}{suffix}"
+    head = text[:length]
+    if text[length] != " ":
+        head = head.rsplit(" ", 1)[0]
+    return f"{head.rstrip()}{suffix}"
 
 
 def parse_tag_list(value: str | Iterable[str] | None) -> list[str]:

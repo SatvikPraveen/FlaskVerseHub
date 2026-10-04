@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "macros/items.html" import item_card %}
+{% from "macros/pagination.html" import render_pagination %}
+{% block title %}{% if query %}“{{ query }}” · {% endif %}Search · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <form class="search-form mb-4" method="get" action="{{ url_for('main.search') }}" role="search">
+    <div class="input-group input-group-lg">
+      <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+      <input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Search titles, summaries and content…" autofocus />
+      <button class="btn btn-primary" type="submit">Search</button>
+    </div>
+  </form>
+  {% if query %}
+    {% if results and results.total %}
+      <p class="text-muted">{{ results.total }} result{{ 's' if results.total != 1 }} for <strong>{{ query }}</strong>
+        {% if results.ranker %}<span class="badge text-bg-light border ms-2">ranked by {{ results.ranker|upper }} in {{ results.elapsed_ms }} ms</span>{% endif %}</p>
+      <div class="row g-3">
+        {% for item in results.items %}<div class="col-md-6 col-lg-4">{{ item_card(item) }}</div>{% endfor %}
+      </div>
+      {{ render_pagination(results, 'main.search', {'q': query}) }}
+    {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="fa-regular fa-face-frown fa-2x mb-3 d-block"></i>
+        No results for <strong>{{ query }}</strong>. Try different or fewer words.
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

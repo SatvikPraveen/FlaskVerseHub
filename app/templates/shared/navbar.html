@@ -1,0 +1,66 @@
+{% set nav = [
+  ('main.index', 'Home', 'fa-house'),
+  ('knowledge_vault.index', 'Knowledge Vault', 'fa-book'),
+  ('dashboard.index', 'Dashboard', 'fa-chart-line'),
+  ('api_hub.docs', 'API', 'fa-plug'),
+  ('main.about', 'About', 'fa-circle-info'),
+] %}
+<nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('main.index') }}">
+      <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="" width="28" height="28" />
+      <span class="brand-text fw-semibold">{{ app_name }}</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        {% for endpoint, label, icon in nav if endpoint in url_map_endpoints %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint and request.endpoint.split('.')[0] == endpoint.split('.')[0] and (endpoint != 'main.about' or request.endpoint == 'main.about') %}active{% endif %}" href="{{ url_for(endpoint) }}">
+            <i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      <form class="d-flex me-lg-3 my-2 my-lg-0" role="search" action="{{ url_for('main.search') }}" method="get">
+        <div class="input-group input-group-sm">
+          <input class="form-control" type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search knowledge…" aria-label="Search" />
+          <button class="btn btn-outline-primary" type="submit" aria-label="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </div>
+      </form>
+      <ul class="navbar-nav">
+        {% if current_user.is_authenticated %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="user-avatar-sm">{{ current_user.username[0]|upper }}</span>
+            <span>{{ current_user.username }}</span>
+            {% if current_user.is_admin %}<span class="badge text-bg-danger">admin</span>{% endif %}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% if 'auth.profile' in url_map_endpoints %}
+            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="fa-regular fa-user me-2"></i>Profile</a></li>
+            {% endif %}
+            {% if 'knowledge_vault.create' in url_map_endpoints %}
+            <li><a class="dropdown-item" href="{{ url_for('knowledge_vault.create') }}"><i class="fa-solid fa-plus me-2"></i>New item</a></li>
+            {% endif %}
+            <li><hr class="dropdown-divider" /></li>
+            {% if 'auth.logout' in url_map_endpoints %}
+            <li>
+              <form method="post" action="{{ url_for('auth.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button class="dropdown-item" type="submit"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Sign out</button>
+              </form>
+            </li>
+            {% endif %}
+          </ul>
+        </li>
+        {% elif 'auth.login' in url_map_endpoints %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">Sign in</a></li>
+        <li class="nav-item"><a class="btn btn-primary btn-sm ms-lg-2" href="{{ url_for('auth.register') }}">Create account</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>

@@ -40,12 +40,20 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.engine import Dialect
-from sqlalchemy.orm import Mapped, Mapper, Session, mapped_column, relationship, validates
+from sqlalchemy.orm import (
+    DynamicMapped,
+    Mapped,
+    Mapper,
+    Session,
+    mapped_column,
+    relationship,
+    validates,
+)
 from sqlalchemy.sql import Select
 from sqlalchemy.types import TypeDecorator
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import db
+from app.extensions import Base, db
 from app.utils.text import (
     parse_tag_list,
     reading_time_minutes,
@@ -94,14 +102,14 @@ class TimestampMixin:
 
 user_roles = Table(
     "user_roles",
-    db.metadata,
+    Base.metadata,
     Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
 )
 
 knowledge_item_tags = Table(
     "knowledge_item_tags",
-    db.metadata,
+    Base.metadata,
     Column(
         "item_id", Integer, ForeignKey("knowledge_items.id", ondelete="CASCADE"), primary_key=True
     ),
@@ -140,7 +148,7 @@ class NotificationKind(enum.StrEnum):
 # --------------------------------------------------------------------------- #
 
 
-class Role(TimestampMixin, db.Model):
+class Role(TimestampMixin, Base):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -157,7 +165,7 @@ class Role(TimestampMixin, db.Model):
         return f"<Role {self.name}>"
 
 
-class User(UserMixin, TimestampMixin, db.Model):
+class User(UserMixin, TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("length(username) >= 3", name="ck_users_username_min_length"),
@@ -192,26 +200,26 @@ class User(UserMixin, TimestampMixin, db.Model):
     roles: Mapped[list[Role]] = relationship(
         "Role", secondary=user_roles, back_populates="users", lazy="selectin"
     )
-    knowledge_items: Mapped[list[KnowledgeItem]] = relationship(
+    knowledge_items: DynamicMapped[KnowledgeItem] = relationship(
         "KnowledgeItem",
         back_populates="author",
         foreign_keys="KnowledgeItem.author_id",
         cascade="all, delete-orphan",
         lazy="dynamic",
     )
-    api_keys: Mapped[list[ApiKey]] = relationship(
+    api_keys: DynamicMapped[ApiKey] = relationship(
         "ApiKey", back_populates="owner", cascade="all, delete-orphan", lazy="dynamic"
     )
-    activities: Mapped[list[Activity]] = relationship(
+    activities: DynamicMapped[Activity] = relationship(
         "Activity", back_populates="user", cascade="all, delete-orphan", lazy="dynamic"
     )
-    comments: Mapped[list[Comment]] = relationship(
+    comments: DynamicMapped[Comment] = relationship(
         "Comment", back_populates="author", cascade="all, delete-orphan", lazy="dynamic"
     )
-    bookmarks: Mapped[list[Bookmark]] = relationship(
+    bookmarks: DynamicMapped[Bookmark] = relationship(
         "Bookmark", back_populates="user", cascade="all, delete-orphan", lazy="dynamic"
     )
-    notifications: Mapped[list[Notification]] = relationship(
+    notifications: DynamicMapped[Notification] = relationship(
         "Notification", back_populates="user", cascade="all, delete-orphan", lazy="dynamic"
     )
 
@@ -288,7 +296,7 @@ class User(UserMixin, TimestampMixin, db.Model):
         return f"<User {self.username}>"
 
 
-class ApiKey(TimestampMixin, db.Model):
+class ApiKey(TimestampMixin, Base):
     """Hashed API credential. The clear-text key is shown exactly once at creation."""
 
     __tablename__ = "api_keys"
@@ -325,6 +333,7 @@ class ApiKey(TimestampMixin, db.Model):
             scopes=scopes or ["read"],
             owner=owner,
         )
+        db.session.add(record)
         return record, raw
 
     @classmethod
@@ -355,7 +364,7 @@ class ApiKey(TimestampMixin, db.Model):
 # --------------------------------------------------------------------------- #
 
 
-class Category(TimestampMixin, db.Model):
+class Category(TimestampMixin, Base):
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -370,13 +379,13 @@ class Category(TimestampMixin, db.Model):
         "Category", remote_side="Category.id", back_populates="children"
     )
     children: Mapped[list[Category]] = relationship("Category", back_populates="parent")
-    items: Mapped[list[KnowledgeItem]] = relationship(
+    items: DynamicMapped[KnowledgeItem] = relationship(
         "KnowledgeItem", back_populates="category", lazy="dynamic"
     )
 
     @property
     def item_count(self) -> int:
-        return self.items.count()  # type: ignore[attr-defined]
+        return self.items.count()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -393,14 +402,14 @@ class Category(TimestampMixin, db.Model):
         return f"<Category {self.slug}>"
 
 
-class Tag(db.Model):
+class Tag(Base):
     __tablename__ = "tags"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     slug: Mapped[str] = mapped_column(String(60), unique=True, nullable=False, index=True)
 
-    items: Mapped[list[KnowledgeItem]] = relationship(
+    items: DynamicMapped[KnowledgeItem] = relationship(
         "KnowledgeItem", secondary=knowledge_item_tags, back_populates="tags", lazy="dynamic"
     )
 
@@ -417,13 +426,13 @@ class Tag(db.Model):
 
     @property
     def usage_count(self) -> int:
-        return self.items.count()  # type: ignore[attr-defined]
+        return self.items.count()
 
     def __repr__(self) -> str:
         return f"<Tag {self.name}>"
 
 
-class KnowledgeItem(TimestampMixin, db.Model):
+class KnowledgeItem(TimestampMixin, Base):
     __tablename__ = "knowledge_items"
     __table_args__ = (
         Index("ix_knowledge_items_visibility", "is_public", "status"),
@@ -471,24 +480,24 @@ class KnowledgeItem(TimestampMixin, db.Model):
     tags: Mapped[list[Tag]] = relationship(
         "Tag", secondary=knowledge_item_tags, back_populates="items", lazy="selectin"
     )
-    revisions: Mapped[list[KnowledgeItemRevision]] = relationship(
+    revisions: DynamicMapped[KnowledgeItemRevision] = relationship(
         "KnowledgeItemRevision",
         back_populates="item",
         cascade="all, delete-orphan",
         order_by="KnowledgeItemRevision.version.desc()",
         lazy="dynamic",
     )
-    comments: Mapped[list[Comment]] = relationship(
+    comments: DynamicMapped[Comment] = relationship(
         "Comment",
         back_populates="item",
         cascade="all, delete-orphan",
         order_by="Comment.created_at",
         lazy="dynamic",
     )
-    attachments: Mapped[list[Attachment]] = relationship(
+    attachments: DynamicMapped[Attachment] = relationship(
         "Attachment", back_populates="item", cascade="all, delete-orphan", lazy="dynamic"
     )
-    bookmarks: Mapped[list[Bookmark]] = relationship(
+    bookmarks: DynamicMapped[Bookmark] = relationship(
         "Bookmark", back_populates="item", cascade="all, delete-orphan", lazy="dynamic"
     )
 
@@ -566,7 +575,7 @@ class KnowledgeItem(TimestampMixin, db.Model):
         return bool(user.is_admin or self.author_id == user.id)
 
     @classmethod
-    def visible_to(cls, user: User | None) -> Select[tuple[KnowledgeItem]]:
+    def visible_to(cls, user: User | None) -> Select[KnowledgeItem]:
         """Base query for every item ``user`` may read.
 
         Anonymous users see published public items; authenticated users also
@@ -613,7 +622,7 @@ class KnowledgeItem(TimestampMixin, db.Model):
         return f"<KnowledgeItem {self.slug}>"
 
 
-class KnowledgeItemRevision(db.Model):
+class KnowledgeItemRevision(Base):
     """Immutable snapshot of a knowledge item at a given version."""
 
     __tablename__ = "knowledge_item_revisions"
@@ -638,7 +647,7 @@ class KnowledgeItemRevision(db.Model):
         return f"<Revision item={self.item_id} v{self.version}>"
 
 
-class Comment(TimestampMixin, db.Model):
+class Comment(TimestampMixin, Base):
     __tablename__ = "comments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -674,7 +683,7 @@ class Comment(TimestampMixin, db.Model):
         return f"<Comment {self.id} on item {self.item_id}>"
 
 
-class Bookmark(db.Model):
+class Bookmark(Base):
     __tablename__ = "bookmarks"
     __table_args__ = (UniqueConstraint("user_id", "item_id", name="uq_bookmark_user_item"),)
 
@@ -691,7 +700,7 @@ class Bookmark(db.Model):
     item: Mapped[KnowledgeItem] = relationship("KnowledgeItem", back_populates="bookmarks")
 
 
-class Attachment(TimestampMixin, db.Model):
+class Attachment(TimestampMixin, Base):
     __tablename__ = "attachments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -726,7 +735,7 @@ class Attachment(TimestampMixin, db.Model):
 # --------------------------------------------------------------------------- #
 
 
-class Activity(db.Model):
+class Activity(Base):
     """Append-only audit trail of user and system actions."""
 
     __tablename__ = "activities"
@@ -764,7 +773,7 @@ class Activity(db.Model):
         return f"<Activity {self.action} by {self.user_id}>"
 
 
-class Notification(db.Model):
+class Notification(Base):
     __tablename__ = "notifications"
     __table_args__ = (Index("ix_notifications_user_unread", "user_id", "is_read"),)
 
@@ -803,7 +812,7 @@ class Notification(db.Model):
         }
 
 
-class Setting(TimestampMixin, db.Model):
+class Setting(TimestampMixin, Base):
     """Typed key/value store for runtime-adjustable application settings."""
 
     __tablename__ = "settings"

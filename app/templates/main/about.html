@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}About · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 860px">
+  <h1 class="mb-3">About {{ app_name }}</h1>
+  <p class="lead text-muted">
+    {{ app_name }} is a reference Flask application built to be read, measured, and extended.
+    Every architectural decision is documented, every layer is tested, and the search engine
+    at its core ships with a reproducible evaluation harness.
+  </p>
+  <div class="row g-4 my-4">
+    {% for icon, title, body in [
+      ('fa-diagram-project', 'Layered architecture', 'Application factory, blueprints per bounded context, a service layer between HTTP and persistence, and a single visibility policy shared by every interface.'),
+      ('fa-database', 'Typed persistence', 'SQLAlchemy 2.0 Mapped models checked by mypy, timezone-correct timestamps on every backend, append-only revision history and an audit trail.'),
+      ('fa-plug', 'Three interfaces, one domain', 'Server-rendered pages, a versioned REST API with OpenAPI documentation, and a GraphQL schema all consume the same services.'),
+      ('fa-flask', 'Research-grade retrieval', 'BM25 and TF-IDF rankers implemented from first principles, evaluated with nDCG, MAP and MRR on a reproducible benchmark with confidence intervals.'),
+      ('fa-shield-halved', 'Security by default', 'CSRF, rate limiting, account lockout, HTML sanitisation, hashed API keys, strict security headers and JWT with refresh rotation.'),
+      ('fa-chart-line', 'Observability', 'Structured logs with request correlation, slow-query detection, Prometheus metrics and health/readiness probes.'),
+    ] %}
+    <div class="col-md-6">
+      <div class="d-flex gap-3">
+        <i class="fa-solid {{ icon }} fa-xl text-primary mt-1" aria-hidden="true"></i>
+        <div><h2 class="h5 mb-1">{{ title }}</h2><p class="text-muted small mb-0">{{ body }}</p></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <h2 class="h4 mt-5">Documentation</h2>
+  <ul>
+    <li><a href="https://github.com/SatvikPraveen/FlaskVerseHub#readme" rel="noopener">README and quick start</a></li>
+    <li><a href="https://github.com/SatvikPraveen/FlaskVerseHub/blob/main/docs/ARCHITECTURE.md" rel="noopener">Architecture</a></li>
+    <li><a href="https://github.com/SatvikPraveen/FlaskVerseHub/blob/main/docs/RESEARCH.md" rel="noopener">Retrieval research notes and benchmark results</a></li>
+    <li><a href="https://github.com/SatvikPraveen/FlaskVerseHub/tree/main/docs/adr" rel="noopener">Architecture decision records</a></li>
+  </ul>
+  <p class="text-muted small mt-4">Created and maintained by Satvik Praveen. Released under the MIT License.</p>
+</div>
+{% endblock %}
