@@ -1,429 +1,165 @@
-# File: docs/ARCHITECTURE.md
+# Architecture
 
-# FlaskVerseHub Architecture Overview
+This document explains how FlaskVerseHub is put together and why. It is
+written for someone who wants to change the system safely. Decisions with
+lasting consequences are recorded individually under [`adr/`](adr/).
 
-This document provides a comprehensive overview of the FlaskVerseHub application architecture, design patterns, and system components.
+## 1. Shape of the system
 
-## 🏗 High-Level Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Client Layer                             │
-├─────────────────────────────────────────────────────────────────┤
-│  Web Browser  │  Mobile App  │  API Clients  │  CLI Tools     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                     Presentation Layer                         │
-├─────────────────────────────────────────────────────────────────┤
-│  Templates (Jinja2)  │  Static Assets  │  WebSocket Events    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                     Application Layer                          │
-├─────────────────────────────────────────────────────────────────┤
-│  Flask Routes  │  REST API  │  GraphQL  │  SocketIO Handlers  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                      Business Layer                            │
-├─────────────────────────────────────────────────────────────────┤
-│  Models  │  Services  │  Utilities  │  Security  │  Events    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                       Data Layer                               │
-├─────────────────────────────────────────────────────────────────┤
-│  Database (PostgreSQL/SQLite)  │  Cache (Redis)  │  Files     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## 📁 Project Structure
-
-### Application Factory Pattern
-
-```python
-# app/__init__.py
-def create_app(config_name=None):
-    app = Flask(__name__)
-    app.config.from_object(config[config_name])
-
-    init_extensions(app)
-    register_blueprints(app)
-    register_error_handlers(app)
-
-    return app
-```
-
-**Benefits:**
-
-- Multiple app instances for testing
-- Configuration flexibility
-- Extension isolation
-- Blueprint modularity
-
-### Blueprint Architecture
-
-The application is organized into functional blueprints:
+FlaskVerseHub is a modular monolith: one deployable Flask application whose
+code is organised by *bounded context* (blueprints) with a shared service
+layer and a single domain model. The layering is strict and one-directional:
 
 ```
-app/
-├── knowledge_vault/     # Knowledge management
-├── api_hub/            # REST & GraphQL APIs
-├── dashboard/          # Real-time dashboard
-├── auth/               # Authentication
-├── errors/             # Error handling
-└── cli/                # CLI commands
+interfaces   →   services   →   domain model   →   platform
+(HTML, REST, GraphQL, sockets)   (use-cases)       (SQLAlchemy, search)   (DB, Redis, logging)
 ```
 
-Each blueprint follows the same structure:
+* **Interfaces** translate HTTP, GraphQL or socket input into service calls
+  and map the results to a representation. They contain no business rules.
+* **Services** (`app/*/service.py`, `app/services/`) implement use-cases:
+  registration, authentication, item editing with revisions, bulk actions,
+  bookmarks, comments, notifications, search. They are plain functions that
+  can be unit-tested with a database and no HTTP client.
+* **Domain model** (`app/models.py`, `app/search/`) owns invariants: slug
+  uniqueness, lockout policy, the visibility policy, revision snapshots,
+  the ranking functions.
+* **Platform** concerns (config, extensions, observability, security
+  headers, errors) are initialised by the application factory.
 
-- `__init__.py` - Blueprint registration
-- `routes.py` - HTTP endpoints
-- `forms.py` - Form validation
-- `templates/` - HTML templates
-- `static/` - CSS/JS assets
-- `tests/` - Unit tests
+## 2. Application factory
 
-## 🗄 Data Model
+`app.create_app(config_name, overrides)` builds the application in a fixed
+order: configuration, extensions, blueprints, cross-cutting infrastructure
+(observability, search index invalidation, error handlers, security headers,
+CLI), template helpers and shell context. Blueprints are registered from a
+single table in `_register_blueprints`, so the URL map is discoverable in one
+place:
 
-### Entity Relationship Diagram
+| Blueprint | Prefix | Responsibility |
+|---|---|---|
+| `main` | `/` | landing page, site search, about, status, tags, `/health` |
+| `auth` | `/auth` | accounts, sessions, password flows, API keys |
+| `knowledge_vault` | `/knowledge` | authoring and browsing items |
+| `api_hub` | `/api/v1` | REST, OpenAPI, GraphQL |
+| `dashboard` | `/dashboard` | personal and admin dashboards, notifications, audit |
 
-```
-┌─────────────┐      ┌──────────────────┐      ┌─────────────┐
-│    User     │      │ KnowledgeEntry   │      │  Category   │
-├─────────────┤      ├──────────────────┤      ├─────────────┤
-│ id (PK)     │◄────►│ id (PK)          │      │ id (PK)     │
-│ username    │      │ title            │      │ name        │
-│ email       │      │ content          │      │ description │
-│ password    │      │ category         │      │ color       │
-│ is_admin    │      │ tags             │      └─────────────┘
-│ created_at  │      │ is_public        │
-└─────────────┘      │ author_id (FK)   │
-                     │ created_at       │
-                     └──────────────────┘
-```
+Configuration profiles (`app/config.py`) are plain classes read from the
+environment. Production refuses to start without `SECRET_KEY` and
+`DATABASE_URL`; testing uses an in-memory SQLite database on a `StaticPool`
+so the whole test session shares one connection.
 
-### Model Relationships
+## 3. Domain model
 
-```python
-class User(db.Model):
-    knowledge_entries = db.relationship('KnowledgeEntry',
-                                      backref='author',
-                                      cascade='all, delete-orphan')
+The model uses SQLAlchemy 2.0 `Mapped[]` declarations and is type-checked by
+mypy. Highlights:
 
-class KnowledgeEntry(db.Model):
-    author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-```
+* **`UTCDateTime`** stores naive UTC and returns aware datetimes on every
+  backend. SQLite would otherwise return naive values and comparisons would
+  raise. All code uses `app.utils.time.utcnow()`; `datetime.utcnow()` is
+  banned by ruff's `DTZ` rules.
+* **`KnowledgeItem`** is the aggregate root: one author, one optional
+  category, many tags, append-only `KnowledgeItemRevision` rows, comments,
+  bookmarks and attachments. `bump_version()` snapshots the current state
+  before an edit so history is complete and restorable.
+* **Visibility policy.** `KnowledgeItem.visible_to(user)` returns the base
+  `Select` every reader must start from; `is_visible_to(user)` is the
+  per-instance twin. Anonymous users see published public items, users also
+  see their own, administrators see everything. Search applies the policy
+  *after* scoring so index statistics are not biased by the viewer.
+* **Identity.** `User` carries lockout state (`register_failed_login`),
+  roles (many-to-many, with a default role attached on insert) and a JSON
+  preferences bag. `ApiKey` stores only a SHA-256 hash and a display prefix.
+* **Audit.** `Activity` rows are appended by `app.services.activity` from
+  every service that mutates state; request metadata is captured when a
+  request is active.
 
-## 🔧 Core Components
+Slugs are generated in `before_insert` listeners with a uniqueness probe,
+and `published_at` is set when an item first becomes published.
 
-### 1. Authentication System
+## 4. Services and events
 
-```python
-# Multi-layer authentication approach
-├── Flask-Login (Session-based)
-├── JWT Tokens (API access)
-├── CSRF Protection
-└── Password Hashing (Werkzeug)
-```
+Services return domain objects or raise typed errors
+(`DuplicateAccountError`, `PermissionDeniedError`); interfaces decide the
+HTTP status. Side effects fan out from the service layer:
 
-**Features:**
+* `services.activity.record_activity` – audit trail
+* `services.notifications.notify` – in-app notification plus Socket.IO push
+  to the user's room
+* `services.events` – `item:created|updated|deleted`, `comment:added` to the
+  `public` room and `item:<slug>` rooms
 
-- Session management for web interface
-- JWT tokens for API access
-- Role-based access control
-- Password strength validation
-- Account lockout protection
+Because REST, GraphQL and HTML all call the same functions, every interface
+produces identical audit rows, notifications and real-time events.
 
-### 2. API Layer
+## 5. Search engine
 
-#### REST API Architecture
-
-```python
-# RESTful endpoint design
-GET    /api/v1/entries          # Collection
-POST   /api/v1/entries          # Create
-GET    /api/v1/entries/{id}     # Resource
-PUT    /api/v1/entries/{id}     # Update
-DELETE /api/v1/entries/{id}     # Delete
-```
-
-#### GraphQL Schema
-
-```python
-# Flexible query interface
-query {
-  entries(first: 10, filter: {category: "technical"}) {
-    edges {
-      node {
-        id
-        title
-        author { username }
-      }
-    }
-  }
-}
-```
-
-### 3. Real-time Features
-
-```python
-# SocketIO integration
-@socketio.on('connect', namespace='/dashboard')
-def on_connect():
-    join_room(f'user_{current_user.id}')
-    emit('connected', {'status': 'success'})
-```
-
-**Real-time Capabilities:**
-
-- Live dashboard updates
-- User activity notifications
-- System status monitoring
-- WebSocket fallback support
-
-### 4. Caching Strategy
-
-```python
-# Multi-level caching
-├── Application Cache (Flask-Caching)
-├── Database Query Cache
-├── Template Fragment Cache
-└── Static Asset Cache (CDN)
-```
-
-**Cache Levels:**
-
-- **L1 Cache**: Application memory (simple cache)
-- **L2 Cache**: Redis (distributed cache)
-- **L3 Cache**: CDN (static assets)
-
-### 5. Security Architecture
-
-```python
-# Defense in depth approach
-├── Input Validation & Sanitization
-├── CSRF Token Protection
-├── XSS Prevention
-├── SQL Injection Prevention
-├── Rate Limiting
-└── Security Headers
-```
-
-## 🔄 Request Flow
-
-### Web Request Flow
+`app/search` is an independent package (it imports nothing from Flask except
+in `service.py`):
 
 ```
-1. Client Request
-   ↓
-2. WSGI Server (Gunicorn)
-   ↓
-3. Flask Application
-   ↓
-4. Blueprint Router
-   ↓
-5. Authentication Middleware
-   ↓
-6. Route Handler
-   ↓
-7. Business Logic
-   ↓
-8. Database Query
-   ↓
-9. Template Rendering
-   ↓
-10. HTTP Response
+Analyzer (tokenise → stop words → Porter stem)
+   └─▶ InvertedIndex (postings as NumPy arrays, boosted tf, doc lengths)
+          └─▶ Ranker.score(index, terms) → ndarray of scores
+                 ├─ BM25Ranker        Robertson et al. 1994
+                 ├─ BM25PlusRanker    Lv & Zhai 2011
+                 └─ TFIDFRanker       Salton & Buckley 1988 (lnc.ltc cosine)
+SearchEngine: pagination, post-scoring filters, explain(), suggest()
 ```
 
-### API Request Flow
+Field boosts are folded into term frequency *and* document length so BM25's
+normalisation stays coherent. `service.py` keeps one engine per process,
+rebuilt when a `(count, max(updated_at))` fingerprint changes or a TTL
+expires, and invalidated eagerly by a session `before_flush` hook.
+`app/search/metrics.py` implements the evaluation suite used by
+`experiments/`.
 
-```
-1. API Request
-   ↓
-2. Rate Limiting
-   ↓
-3. JWT Authentication
-   ↓
-4. Route Handler
-   ↓
-5. Input Validation
-   ↓
-6. Business Logic
-   ↓
-7. Data Serialization
-   ↓
-8. JSON Response
-```
+## 6. Interfaces
 
-## 📊 Performance Architecture
+* **HTML** uses Flask-WTF forms, Jinja templates under `app/templates/`
+  (one root, blueprint sub-folders) and Bootstrap 5. CSRF is enforced on
+  every form; destructive actions are POST-only.
+* **REST v1** (`app/api_hub/rest_routes.py`) is CSRF-exempt and
+  authenticates with a Bearer JWT (Flask-JWT-Extended, access + refresh) or
+  `X-API-Key`. marshmallow schemas define the contract and feed the
+  OpenAPI 3.1 generator (`openapi.py`), so documentation cannot drift from
+  validation.
+* **GraphQL** (`graphql_routes.py`) is a graphene 3 projection of the same
+  services with mutations guarded by the same permission checks.
+* **Socket.IO** (`dashboard/sockets.py`) authenticates from the session
+  cookie and manages rooms; the client in `static/js/socket.js` renders the
+  live feed and notification badge.
 
-### Database Optimization
+## 7. Cross-cutting concerns
 
-```python
-# Query optimization strategies
-├── Database Indexes
-├── Query Pagination
-├── Lazy Loading
-├── Connection Pooling
-└── Read Replicas (Production)
-```
+| Concern | Implementation |
+|---|---|
+| Errors | `app/errors/handlers.py` negotiates JSON problem documents for `/api/*` or JSON-accepting clients and rendered pages otherwise; every payload carries the request id |
+| Logging | structlog with contextvars; `X-Request-ID` generated or propagated and bound to every log line |
+| Metrics | `prometheus-flask-exporter` at `/metrics`, build info gauge |
+| Timing | `Server-Timing` header; slow queries (≥ 0.5 s) logged with statement and location |
+| Security | CSP, `nosniff`, frame denial, referrer and permissions policies, HSTS when cookies are secure; nh3 HTML sanitisation; `session_protection="strong"`; account lockout; rate limits on auth and API |
+| Persistence | Alembic migrations in `migrations/`; custom types render as plain SQLAlchemy types; SQLite uses batch mode |
 
-### Caching Strategy
+## 8. Testing strategy
 
-```python
-# Intelligent caching layers
-@cache.cached(timeout=300)
-def get_popular_entries():
-    return Entry.query.filter_by(is_featured=True).all()
-```
+* `tests/unit` – models, utilities, config, services (no HTTP)
+* `tests/integration` – blueprints through the Flask test client, sockets
+  through the Socket.IO test client
+* `tests/api` – REST and GraphQL contracts
+* `tests/research` – analyzer, index, rankers (with Hypothesis property
+  tests), metrics, engine, Flask search service, end-to-end benchmark
+  reproducibility
 
-### Async Operations
+The session-scoped app shares one in-memory database; tables are emptied
+after each test. Because the app context stays pushed, request-scoped `g`
+state is reset by a test-only `before_request` hook, which mirrors
+production behaviour where `g` is fresh per request.
 
-```python
-# Background task processing
-├── Email Notifications (Threading)
-├── File Processing (Celery)
-├── Database Cleanup (Scheduled)
-└── Statistics Aggregation (Background)
-```
+## 9. Deployment
 
-## 🔐 Security Architecture
-
-### Authentication Flow
-
-```
-1. User Login
-   ↓
-2. Password Verification
-   ↓
-3. Session Creation
-   ↓
-4. JWT Token Generation (API)
-   ↓
-5. Access Control Check
-   ↓
-6. Resource Access
-```
-
-### Data Protection
-
-```python
-# Data security measures
-├── Password Hashing (Werkzeug + Salt)
-├── SQL Injection Prevention (SQLAlchemy ORM)
-├── XSS Protection (Input Sanitization)
-├── CSRF Tokens (Flask-WTF)
-└── Secure Headers (Production)
-```
-
-## 🚀 Deployment Architecture
-
-### Development Environment
-
-```
-┌─────────────────┐
-│ Flask Dev Server│
-├─────────────────┤
-│ SQLite Database │
-├─────────────────┤
-│ Simple Cache    │
-└─────────────────┘
-```
-
-### Production Environment
-
-```
-┌─────────────────┐    ┌─────────────────┐
-│ Load Balancer   │────│ Nginx (Reverse  │
-│ (AWS ALB)       │    │ Proxy + Static) │
-└─────────────────┘    └─────────────────┘
-         │                       │
-┌─────────────────┐    ┌─────────────────┐
-│ Gunicorn        │────│ Flask App       │
-│ (WSGI Server)   │    │ (Multiple       │
-│                 │    │ Workers)        │
-└─────────────────┘    └─────────────────┘
-         │                       │
-┌─────────────────┐    ┌─────────────────┐
-│ PostgreSQL      │    │ Redis Cache     │
-│ (Primary DB)    │    │ & Sessions      │
-└─────────────────┘    └─────────────────┘
-```
-
-## 🔄 Data Flow Patterns
-
-### CRUD Operations
-
-```python
-# Standard CRUD pattern
-CREATE → Validate → Save → Notify → Response
-READ   → Authorize → Query → Cache → Response
-UPDATE → Authorize → Validate → Save → Notify
-DELETE → Authorize → Remove → Cleanup → Response
-```
-
-### Event-Driven Architecture
-
-```python
-# Event system for loose coupling
-User Registration → Email Verification Event
-Entry Creation   → Statistics Update Event
-User Login       → Activity Tracking Event
-```
-
-## 📈 Scalability Considerations
-
-### Horizontal Scaling
-
-- **Stateless Application**: Session data in Redis
-- **Database Sharding**: User-based partitioning
-- **CDN Integration**: Static asset distribution
-- **Microservices**: Future service separation
-
-### Vertical Scaling
-
-- **Connection Pooling**: Database optimization
-- **Query Optimization**: Index strategies
-- **Memory Management**: Efficient caching
-- **CPU Optimization**: Background processing
-
-## 🧪 Testing Architecture
-
-### Test Pyramid
-
-```
-┌─────────────────────────────────────┐
-│           E2E Tests                 │  ← Few, Expensive
-├─────────────────────────────────────┤
-│       Integration Tests             │  ← Some, Moderate
-├─────────────────────────────────────┤
-│          Unit Tests                 │  ← Many, Fast
-└─────────────────────────────────────┘
-```
-
-### Test Organization
-
-```
-tests/
-├── unit/              # Component isolation
-├── integration/       # Component interaction
-├── api/              # API endpoint testing
-├── fixtures/         # Test data
-└── conftest.py       # Shared test configuration
-```
-
-## 🔮 Future Enhancements
-
-### Planned Architecture Improvements
-
-1. **Microservices Migration**: Service decomposition
-2. **Event Sourcing**: Audit trail and replay capability
-3. **CQRS Pattern**: Command/Query separation
-4. **Container Orchestration**: Kubernetes deployment
-5. **Service Mesh**: Inter-service communication
-6. **Distributed Tracing**: Performance monitoring
-7. **GraphQL Federation**: Schema composition
-
-This architecture provides a solid foundation for a scalable, maintainable, and secure knowledge sharing platform while maintaining flexibility for future enhancements.
+See [DEPLOYMENT.md](DEPLOYMENT.md). In short: gunicorn with
+`gevent-websocket` workers behind a TLS-terminating proxy, PostgreSQL, Redis
+for cache, rate limits and the Socket.IO message queue, migrations applied by
+the container entrypoint, `/health` for readiness and `/metrics` for
+Prometheus.

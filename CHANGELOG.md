@@ -1,160 +1,57 @@
-# File: FlaskVerseHub/CHANGELOG.md
-
 # Changelog
 
-All notable changes to FlaskVerseHub will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
+adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
+## [2.0.0] – 2026-10-03
 
-- Initial project structure and architecture
-- Comprehensive documentation and setup guides
-
-## [1.0.0] - 2024-12-XX
+A ground-up rebuild. The 1.x scaffold could not start (import errors, an
+inconsistent model, invalid configuration) and is superseded entirely.
 
 ### Added
+- Typed SQLAlchemy 2.0 domain model with UTC-normalised timestamps, tags,
+  append-only revision history, comments, bookmarks, notifications, hashed
+  API keys and an audit trail.
+- Service layer shared by HTML, REST and GraphQL interfaces; a single
+  visibility policy on the model.
+- Authentication: lockout, single-use signed reset tokens, email
+  verification, API keys with scopes, role/permission decorators.
+- Knowledge Vault: filtered listings, HTML sanitisation, revision diffs and
+  restore, bookmarks, threaded comments, bulk actions, JSON/Markdown export.
+- Retrieval engine: Porter stemmer, inverted index, BM25 / BM25+ / TF-IDF
+  rankers, score explanations, suggestions, cached Flask service.
+- Evaluation suite (P@k, R@k, F1, MRR, MAP, nDCG, bootstrap CIs, paired
+  significance test) and a seeded synthetic benchmark with committed results
+  reproduced by CI.
+- REST v1 with OpenAPI 3.1 and Swagger UI; GraphQL with GraphiQL; JWT and
+  API-key authentication; uniform problem-document errors.
+- Dashboard analytics (including reading-time statistics and a Gini
+  coefficient of views), notifications centre, Socket.IO rooms, presence and
+  live feed.
+- Observability: structlog with request ids, Server-Timing, slow-query
+  logging, Prometheus metrics, health probe; hardened security headers.
+- Alembic migrations, multi-stage Docker image, Compose stack, CI matrix
+  (3.11–3.13, PostgreSQL job, benchmark gate, image smoke test), CodeQL,
+  Dependabot, release workflow.
+- Documentation: architecture, research notes, API and deployment guides,
+  eight ADRs, contributing/security/conduct policies, citation metadata.
 
-- **Core Flask Application**
+### Changed
+- Toolchain consolidated into `pyproject.toml` (ruff, mypy, pytest,
+  coverage ≥ 85 %).
+- Templates rewritten on a single root with Bootstrap 5.
 
-  - App factory pattern with blueprint registration
-  - Environment-based configuration system
-  - Database models with SQLAlchemy relationships
-  - Flask extensions integration (SQLAlchemy, Migrate, Login, etc.)
+### Removed
+- Generated scaffold code, the scaffold generator script, obsolete
+  workflows and scripts.
 
-- **Knowledge Vault Blueprint (CRUD Operations)**
+## [1.0.0] – 2025
 
-  - Complete CRUD functionality for knowledge items
-  - WTForms-based form validation
-  - Pagination for list views
-  - Search and filtering capabilities
-  - File upload support
+Initial generated scaffold.
 
-- **API Hub Blueprint**
-
-  - RESTful API endpoints with proper HTTP methods
-  - GraphQL API implementation
-  - Marshmallow serialization
-  - OpenAPI/Swagger documentation
-  - API rate limiting and authentication
-
-- **Authentication & Authorization**
-
-  - User registration and login system
-  - JWT token-based authentication
-  - Role-based access control
-  - Password reset functionality
-  - Email verification system
-
-- **Real-time Dashboard**
-
-  - WebSocket implementation with Flask-SocketIO
-  - Live data updates and notifications
-  - Interactive analytics dashboard
-  - Real-time user activity tracking
-
-- **Security Features**
-
-  - CSRF protection
-  - Password hashing with bcrypt
-  - Input sanitization and XSS protection
-  - Rate limiting for API endpoints
-  - Secure session management
-
-- **Testing Suite**
-
-  - Comprehensive unit tests
-  - Integration tests
-  - API endpoint testing
-  - WebSocket functionality testing
-  - Test fixtures and utilities
-
-- **Development Tools**
-
-  - Custom Flask CLI commands
-  - Database migration scripts
-  - Development environment setup
-  - Docker containerization
-  - CI/CD pipeline configuration
-
-- **Documentation**
-  - Complete API reference
-  - Architecture overview
-  - Deployment instructions
-  - Flask concepts documentation
-
-### Technical Specifications
-
-- Flask 2.3+ compatibility
-- Python 3.8+ support
-- PostgreSQL/MySQL/SQLite database support
-- Redis caching integration
-- Email service integration
-- File upload and management
-- Responsive web design
-- Modern JavaScript (ES6+)
-- CSS3 with Flexbox/Grid layouts
-
-### Dependencies
-
-- **Core**: Flask, SQLAlchemy, WTForms, Jinja2
-- **Extensions**: Flask-Login, Flask-Mail, Flask-Caching, Flask-SocketIO
-- **API**: Flask-JWT-Extended, Marshmallow, Graphene
-- **Testing**: Pytest, Coverage.py
-- **Development**: Black, Flake8, MyPy, Pre-commit
-
-## [0.1.0] - 2024-11-XX
-
-### Added
-
-- Initial project planning and structure design
-- Technology stack selection
-- Development environment setup
-- Basic Flask application skeleton
-
----
-
-## Release Notes
-
-### Version 1.0.0 Highlights
-
-This is the initial stable release of FlaskVerseHub, providing a complete, production-ready Flask application template that demonstrates modern web development best practices.
-
-**Key Features:**
-
-- 🏗️ **Modular Architecture**: Blueprint-based organization for scalability
-- 🔐 **Complete Authentication**: JWT, sessions, role-based access control
-- 📊 **Real-time Features**: WebSocket integration for live updates
-- 🌐 **API-First Design**: RESTful and GraphQL APIs with documentation
-- 🧪 **Testing Suite**: Comprehensive test coverage with pytest
-- 🚀 **Production Ready**: Docker, CI/CD, monitoring, and deployment guides
-
-**Learning Objectives Covered:**
-
-- Flask application factory pattern
-- Database design and relationships
-- Form handling and validation
-- API development and documentation
-- Real-time web applications
-- Authentication and authorization
-- Testing methodologies
-- Deployment strategies
-
-### Migration Guide
-
-This is the first stable release, so no migration is necessary.
-
-### Breaking Changes
-
-None in this initial release.
-
-### Deprecations
-
-None in this initial release.
-
----
-
-For detailed information about each release, please check the git tags and commit history.
+[Unreleased]: https://github.com/SatvikPraveen/FlaskVerseHub/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/SatvikPraveen/FlaskVerseHub/releases/tag/v2.0.0
+[1.0.0]: https://github.com/SatvikPraveen/FlaskVerseHub/commits/5378194

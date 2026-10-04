@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "FlaskVerseHub: a research-grade Flask reference platform with a reproducible retrieval benchmark"
+version: 2.0.0
+date-released: 2026-10-03
+license: MIT
+repository-code: "https://github.com/SatvikPraveen/FlaskVerseHub"
+url: "https://github.com/SatvikPraveen/FlaskVerseHub"
+authors:
+  - family-names: Praveen
+    given-names: Satvik
+    email: satvikpraveen707@gmail.com
+keywords:
+  - flask
+  - information retrieval
+  - bm25
+  - reproducible research
+  - web application architecture
+abstract: >-
+  FlaskVerseHub is a knowledge-management web application that serves as a
+  reference implementation for Flask: typed SQLAlchemy models, REST and
+  GraphQL interfaces over a shared service layer, real-time events,
+  observability, and an information-retrieval engine (BM25, BM25+, TF-IDF)
+  evaluated on a seeded synthetic benchmark with bootstrap confidence
+  intervals that continuous integration reproduces exactly.

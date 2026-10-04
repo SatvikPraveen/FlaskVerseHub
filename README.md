@@ -1,704 +1,214 @@
-# 🔬 FlaskVerseHub
-
 <div align="center">
 
-**Master Every Flask Concept Through One Unified Project**
+<img src="app/static/images/logo.svg" alt="" width="72" height="72" />
 
----
+# FlaskVerseHub
 
-[![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/SatvikPraveen/FlaskVerseHub/ci.yml?branch=main&label=CI%2FCD&logo=github)](https://github.com/SatvikPraveen/FlaskVerseHub/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![Flask](https://img.shields.io/badge/flask-2.3+-green?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000?logo=python&logoColor=white)](https://github.com/psf/black)
+**A research-grade Flask reference platform: typed domain model, REST and GraphQL APIs, real-time events, observability, and a reproducible information-retrieval benchmark.**
 
-[![Stars](https://img.shields.io/github/stars/SatvikPraveen/FlaskVerseHub?style=social)](https://github.com/SatvikPraveen/FlaskVerseHub/stargazers)
-[![Forks](https://img.shields.io/github/forks/SatvikPraveen/FlaskVerseHub?style=social)](https://github.com/SatvikPraveen/FlaskVerseHub/network)
-[![Issues](https://img.shields.io/github/issues/SatvikPraveen/FlaskVerseHub?color=red)](https://github.com/SatvikPraveen/FlaskVerseHub/issues)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/SatvikPraveen/FlaskVerseHub/pulls)
+[![CI](https://img.shields.io/github/actions/workflow/status/SatvikPraveen/FlaskVerseHub/ci.yml?branch=main&label=CI&logo=github)](https://github.com/SatvikPraveen/FlaskVerseHub/actions/workflows/ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/SatvikPraveen/FlaskVerseHub/codeql.yml?branch=main&label=CodeQL&logo=github)](https://github.com/SatvikPraveen/FlaskVerseHub/actions/workflows/codeql.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/SatvikPraveen/FlaskVerseHub?logo=codecov)](https://codecov.io/gh/SatvikPraveen/FlaskVerseHub)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![Flask](https://img.shields.io/badge/Flask-3.x-000000?logo=flask)](https://flask.palletsprojects.com/)
+[![Ruff](https://img.shields.io/badge/linting-ruff-261230?logo=ruff&logoColor=white)](https://docs.astral.sh/ruff/)
+[![Checked with mypy](https://img.shields.io/badge/types-mypy-blue)](https://mypy-lang.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
-[🚀 **Quick Start**](#-quick-start-guide) • [📚 **Documentation**](#-flask-concepts-mastery) • [🧪 **Live Demo**](https://flaskversehub.herokuapp.com) • [💬 **Community**](https://github.com/SatvikPraveen/FlaskVerseHub/discussions)
+[Quick start](#quick-start) · [Architecture](#architecture) · [Retrieval research](#retrieval-research) · [API](#api) · [Documentation](#documentation)
 
 </div>
 
-**Master Every Flask Concept Through One Unified Project**
-
-FlaskVerseHub is a comprehensive, production-ready Flask application that demonstrates complete mastery of Flask development from fundamentals to advanced enterprise patterns. This isn't just another tutorial project—it's a fully-featured knowledge management platform showcasing real-world Flask architecture and best practices.
-
 ---
 
-## 🎯 What Makes This Project Special?
+## Overview
 
-### 📚 **Complete Learning Path**
+FlaskVerseHub is a knowledge-management application built to be *read, measured and extended*. It exercises the full breadth of Flask development in one coherent codebase and treats the hard parts, search ranking, authorization, and observability, with the rigour of a research artefact:
 
-- **Beginner-Friendly**: Start with basic Flask concepts
-- **Intermediate Mastery**: Progress through advanced patterns
-- **Expert-Level**: Dive into production deployment strategies
-- **Portfolio-Ready**: Showcase professional Flask development skills
+- **One domain, three interfaces.** Server-rendered pages, a versioned REST API with an OpenAPI 3.1 document, and a GraphQL schema all call the same service layer. Visibility and permission rules are written once, on the model, and enforced everywhere.
+- **A retrieval engine from first principles.** BM25, BM25+ and TF-IDF are implemented and documented with their references, evaluated with nDCG, MAP and MRR, and benchmarked on a seeded synthetic collection with bootstrap confidence intervals and paired significance tests. CI re-runs the experiment and fails if the committed results do not reproduce bit-for-bit.
+- **Production-shaped engineering.** Typed SQLAlchemy 2.0 models checked by mypy, timezone-correct timestamps on every backend, append-only revision history, structured logs with request correlation, Prometheus metrics, hardened headers, hashed API keys, JWT refresh flows, Alembic migrations, a multi-stage container and a 96 % branch-covered test-suite.
 
-### 🏢 **Enterprise-Grade Architecture**
+## Feature summary
 
-- Modular blueprint organization
-- Comprehensive security implementation
-- Scalable database design
-- Production deployment configuration
-- Full CI/CD pipeline integration
+| Area | What is included |
+|---|---|
+| Knowledge Vault | CRUD with HTML sanitisation, tags, categories, difficulty levels, draft/published/archived workflow, revision history with word-level diffs and restore, bookmarks, threaded comments, bulk actions, JSON/Markdown export |
+| Search | Porter-stemmed inverted index, BM25 / BM25+ / TF-IDF rankers, field boosting, per-term score explanations, query suggestions, visibility-aware results, per-user cached index |
+| Accounts | Registration with email verification, lockout after repeated failures, single-use password-reset tokens, profile and preferences, API keys with scopes, role and permission decorators |
+| APIs | REST v1 (`/api/v1`) with Swagger UI, GraphQL with GraphiQL, Bearer JWT and `X-API-Key` authentication, uniform problem-document errors with request ids, rate limiting |
+| Real-time | Socket.IO rooms per user and per item, presence, live item feed, in-app notifications pushed instantly |
+| Dashboard | Personal overview, admin analytics (Chart.js) including reading-time statistics and a Gini coefficient of view concentration, notifications centre, audit trail |
+| Operations | structlog logging, `X-Request-ID` propagation, Server-Timing, slow-query detection, `/health` and `/metrics`, CSP and security headers, Docker + Compose, GitHub Actions matrix, CodeQL, Dependabot |
 
-### 🔧 **Real-World Application**
+## Quick start
 
-- Knowledge management system with full CRUD operations
-- RESTful and GraphQL APIs with documentation
-- Real-time features using WebSockets
-- User authentication and authorization
-- Admin dashboard with analytics
-
----
-
-## ✨ Features Overview
-
-### 🗃️ **Knowledge Vault**
-
-- **Full CRUD Operations**: Create, read, update, delete knowledge items
-- **Advanced Search**: Full-text search with filtering and sorting
-- **Category Management**: Hierarchical category system
-- **Tag System**: Flexible tagging for better organization
-- **User Bookmarks**: Personal knowledge collections
-- **Comments System**: Threaded discussions on knowledge items
-
-### 🔌 **API Hub**
-
-- **RESTful APIs**: Complete REST endpoints with proper HTTP methods
-- **GraphQL Integration**: Flexible data querying with GraphQL
-- **API Documentation**: Auto-generated Swagger/OpenAPI docs
-- **Rate Limiting**: Protect APIs from abuse
-- **Versioning**: API versioning strategy
-- **Authentication**: JWT-based API authentication
-
-### 📊 **Real-time Dashboard**
-
-- **Live Updates**: WebSocket-powered real-time notifications
-- **Analytics**: User engagement and content metrics
-- **System Monitoring**: Application health and performance
-- **Activity Feed**: Real-time user activity tracking
-- **Interactive Charts**: Data visualization with Chart.js
-
-### 🔐 **Authentication & Security**
-
-- **User Management**: Registration, login, password reset
-- **Role-Based Access**: Admin, moderator, and user roles
-- **Session Management**: Secure session handling
-- **JWT Support**: Token-based authentication for APIs
-- **CSRF Protection**: Cross-site request forgery prevention
-- **Input Sanitization**: XSS attack prevention
-- **Rate Limiting**: Brute force attack protection
-
-### 🛡️ **Security Features**
-
-- **Password Security**: Bcrypt hashing with salt
-- **Email Verification**: Account activation via email
-- **Two-Factor Authentication**: TOTP-based 2FA (optional)
-- **Audit Logging**: Track user actions and system events
-- **Input Validation**: Comprehensive form and API validation
-- **SQL Injection Prevention**: Parameterized queries
-
----
-
-## 🚀 Quick Start Guide
-
-### Prerequisites
-
-- Python 3.10+ installed
-- PostgreSQL 12+ (or SQLite for development)
-- Redis 6+ (for caching and sessions)
-- Node.js 16+ (for frontend tooling)
-- Git for version control
-
-### 1. **Clone Repository**
+### Local (Python 3.11+)
 
 ```bash
 git clone https://github.com/SatvikPraveen/FlaskVerseHub.git
 cd FlaskVerseHub
+./scripts/bootstrap.sh          # venv, dependencies, pre-commit, migrations, demo data
+source .venv/bin/activate
+make run                        # http://127.0.0.1:5000
 ```
 
-### 2. **Set Up Virtual Environment**
+Demo accounts: `admin / AdminPass123!`, `alice / AlicePass123!`, `bob / BobPass123!`.
+
+### Docker Compose (PostgreSQL + Redis)
 
 ```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate (Windows)
-venv\Scripts\activate
-
-# Activate (macOS/Linux)
-source venv/bin/activate
+docker compose -f docker/docker-compose.yml up --build
 ```
 
-### 3. **Install Dependencies**
+The stack applies migrations, seeds reference and demo data, and serves on <http://localhost:8000>.
+
+### Everyday commands
 
 ```bash
-# Development dependencies
-pip install -r requirements/dev.txt
-
-# Or production dependencies
-pip install -r requirements/prod.txt
+make test          # pytest with the 85 % coverage gate
+make lint          # ruff lint + format check
+make typecheck     # mypy over app, experiments and tests
+make security      # bandit
+make experiment    # reproduce the retrieval benchmark into experiments/results/
+make help          # everything else
 ```
 
-### 4. **Environment Configuration**
+## Architecture
+
+```
+            ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+  Clients   │  HTML pages  │   │  REST  v1    │   │   GraphQL    │   │  Socket.IO   │
+            └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
+                   │                  │                  │                  │
+            ┌──────▼──────────────────▼──────────────────▼──────────────────▼───────┐
+  Services  │  auth.service · knowledge_vault.service · search.service · analytics  │
+            │  services.activity (audit) · services.notifications · services.events │
+            └──────────────────────────────┬────────────────────────────────────────┘
+                                           │
+            ┌──────────────────────────────▼────────────────────────────────────────┐
+  Domain    │  SQLAlchemy 2.0 models (visibility policy, revisions, roles, API keys)│
+            │  app.search: Analyzer → InvertedIndex → Ranker (BM25 / BM25+ / TF-IDF)│
+            └──────────────────────────────┬────────────────────────────────────────┘
+                                           │
+            ┌──────────────────────────────▼────────────────────────────────────────┐
+  Platform  │  PostgreSQL / SQLite · Redis (cache, limits, socket queue) · Alembic  │
+            │  structlog · Prometheus · gunicorn + gevent-websocket · Docker        │
+            └───────────────────────────────────────────────────────────────────────┘
+```
+
+Key decisions are recorded as [architecture decision records](docs/adr/) and the full design is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### Repository layout
+
+```
+app/
+  __init__.py          application factory, blueprint table, template helpers
+  config.py            environment-driven profiles (development / testing / production)
+  models.py            typed domain model and ORM event hooks
+  auth/                forms, routes, service layer, timed tokens, authorization decorators
+  knowledge_vault/     item CRUD, revisions, comments, bookmarks, bulk actions
+  api_hub/             REST v1, OpenAPI 3.1 generator, GraphQL schema, API auth
+  dashboard/           analytics queries, notifications, Socket.IO handlers
+  search/              analyzer, inverted index, rankers, metrics, Flask service
+  services/            audit trail, notifications, real-time domain events
+  security/            nh3 sanitisation, response hardening
+  observability.py     logging, request ids, timing, Prometheus
+  errors/              negotiated JSON / HTML error handling
+  templates/, static/  Bootstrap 5 UI
+experiments/           synthetic corpus generator, benchmark runner, committed results
+migrations/            Alembic environment and versions
+tests/                 unit, integration, api and research suites (311 tests)
+docker/                multi-stage Dockerfile, gunicorn config, Compose stack
+docs/                  architecture, research notes, API and deployment guides, ADRs
+```
+
+## Retrieval research
+
+The search engine is treated as an experimental system. `experiments/` contains a seeded synthetic collection with exact graded relevance (topics and subtopics, inflected word forms, log-normal document lengths, keyword-stuffed hard negatives) and a configuration-driven benchmark that reports every metric with 95 % bootstrap confidence intervals and a paired bootstrap test against a baseline.
+
+Headline results from [`experiments/results/REPORT.md`](experiments/results/REPORT.md) (nDCG@10, 600 documents, 96 queries, seed 42):
+
+| System | nDCG@10 | vs. baseline |
+|---|---|---|
+| BM25+ (δ = 1) with Porter stemming | 0.962 | n.s. |
+| **BM25 (k₁ = 1.5, b = 0.75) with Porter stemming** (baseline) | **0.961** | — |
+| BM25 without length normalisation (b = 0) | 0.955 | p < 0.05 |
+| TF-IDF cosine (lnc.ltc) with Porter stemming | 0.954 | p < 0.01 |
+| BM25 (k₁ = 1.5, b = 0.75) without stemming | 0.941 | p < 0.001 |
+
+The findings match the literature: stemming and document-length normalisation matter, k₁ in the usual range has at most a marginal effect (k₁ = 2.0 sits at the p = 0.05 boundary), and BM25 outperforms the vector-space baseline. Methodology, caveats and how to extend the experiment are in [docs/RESEARCH.md](docs/RESEARCH.md). Reproduce with `make experiment`; CI asserts the committed numbers.
+
+## API
+
+Interactive documentation is served at `/api/v1/docs` (Swagger UI) and `/api/v1/graphql` (GraphiQL).
 
 ```bash
-# Copy environment template
-cp .env.example .env
+# Obtain a token
+curl -s -X POST http://localhost:5000/api/v1/auth/token \
+  -H 'Content-Type: application/json' \
+  -d '{"identifier": "alice", "password": "AlicePass123!"}' | jq -r .access_token
 
-# Edit .env file with your settings
-# Required variables:
-# - SECRET_KEY
-# - DATABASE_URL
-# - REDIS_URL
-# - MAIL_SERVER
+# Ranked search with per-hit scores and analysed terms
+curl -s 'http://localhost:5000/api/v1/search?q=flask+blueprints' | jq '.ranker, .terms, .data[0].score'
+
+# Explain why an item scored what it did
+curl -s 'http://localhost:5000/api/v1/items/<slug>/explain?q=blueprints' | jq .data.terms
+
+# GraphQL
+curl -s -X POST http://localhost:5000/api/v1/graphql -H 'Content-Type: application/json' \
+  -d '{"query": "{ search(query: \"sqlalchemy\", perPage: 3) { ranker items { title score } } }"}'
 ```
 
-### 5. **Database Setup**
+Every error is a problem document, `{"error", "message", "status", "details?", "request_id"}`, and every response carries `X-Request-ID` for correlation with the structured logs. See [docs/API.md](docs/API.md).
 
-```bash
-# Initialize database
-flask db upgrade
+## Quality
 
-# Seed with sample data (optional)
-flask seed-data
+| Check | Tooling | Gate |
+|---|---|---|
+| Tests | pytest, Hypothesis, pytest-benchmark | 311 tests, branch coverage ≥ 85 % (currently 96 %) |
+| Static analysis | ruff (lint + format), mypy, bandit | zero findings |
+| Security | CodeQL, Dependabot, CSP and hardened headers, nh3 sanitisation, hashed API keys | weekly scans |
+| Reproducibility | seeded experiments, committed results, CI equality check | exact match |
 
-# Create admin user
-flask create-admin --email admin@example.com --password admin123
+## Configuration
+
+All settings are environment variables with safe defaults; see [`.env.example`](.env.example) for the full list. The most important:
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `FLASK_CONFIG` | `development`, `testing` or `production` | `development` |
+| `SECRET_KEY` | Session, CSRF and JWT signing (required in production) | placeholder |
+| `DATABASE_URL` | SQLAlchemy URL (required in production) | SQLite under `instance/` |
+| `CACHE_TYPE`, `CACHE_REDIS_URL` | Flask-Caching backend | `SimpleCache` |
+| `RATELIMIT_STORAGE_URI` | Flask-Limiter storage | `memory://` |
+| `SOCKETIO_MESSAGE_QUEUE` | Redis URL for multi-worker Socket.IO | unset |
+| `SEARCH_RANKER`, `SEARCH_BM25_K1`, `SEARCH_BM25_B` | Retrieval engine | `bm25`, `1.5`, `0.75` |
+| `LOG_JSON`, `METRICS_ENABLED`, `SENTRY_DSN` | Observability | `false`, `true`, unset |
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) and [decision records](docs/adr/)
+- [Retrieval research notes](docs/RESEARCH.md) and the [benchmark report](experiments/results/REPORT.md)
+- [API guide](docs/API.md)
+- [Deployment guide](docs/DEPLOYMENT.md)
+- [Contributing](CONTRIBUTING.md), [Security policy](SECURITY.md), [Code of conduct](CODE_OF_CONDUCT.md)
+- [Changelog](CHANGELOG.md)
+
+## Citation
+
+If you use FlaskVerseHub in teaching or research, please cite it (see [`CITATION.cff`](CITATION.cff)):
+
+```bibtex
+@software{praveen2026flaskversehub,
+  author  = {Praveen, Satvik},
+  title   = {FlaskVerseHub: a research-grade Flask reference platform with a reproducible retrieval benchmark},
+  year    = {2026},
+  version = {2.0.0},
+  url     = {https://github.com/SatvikPraveen/FlaskVerseHub}
+}
 ```
 
-### 6. **Run Development Server**
+## License
 
-```bash
-# Start Flask development server
-python manage.py
-
-# Or using Flask CLI
-flask run --debug
-```
-
-### 7. **Access Application**
-
-- **Main Application**: http://localhost:5000
-- **API Documentation**: http://localhost:5000/api/docs
-- **GraphQL Playground**: http://localhost:5000/graphql
-- **Admin Dashboard**: http://localhost:5000/admin
-
----
-
-## 📚 Flask Concepts Mastery
-
-### 🏗️ **Application Architecture**
-
-| Concept                      | Implementation       | Location             |
-| ---------------------------- | -------------------- | -------------------- |
-| **App Factory Pattern**      | ✅ Complete          | `app/__init__.py`    |
-| **Blueprint Organization**   | ✅ Modular           | `app/*/` directories |
-| **Configuration Management** | ✅ Environment-based | `app/config.py`      |
-| **Extension Integration**    | ✅ Centralized       | `app/extensions.py`  |
-| **Custom CLI Commands**      | ✅ Management tools  | `app/cli/`           |
-
-### 🗄️ **Database & Models**
-
-| Concept                 | Implementation   | Examples                  |
-| ----------------------- | ---------------- | ------------------------- |
-| **SQLAlchemy ORM**      | ✅ Complete      | `app/models.py`           |
-| **Database Migrations** | ✅ Flask-Migrate | `migrations/`             |
-| **Model Relationships** | ✅ All types     | One-to-many, Many-to-many |
-| **Query Optimization**  | ✅ Advanced      | Eager loading, indexing   |
-| **Database Seeding**    | ✅ Sample data   | `app/utils/seeds.py`      |
-
-### 🔒 **Security Implementation**
-
-| Feature                | Status            | Implementation        |
-| ---------------------- | ----------------- | --------------------- |
-| **Authentication**     | ✅ Complete       | Flask-Login + JWT     |
-| **Authorization**      | ✅ Role-based     | Custom decorators     |
-| **CSRF Protection**    | ✅ Enabled        | Flask-WTF             |
-| **Rate Limiting**      | ✅ API + Views    | Flask-Limiter         |
-| **Input Sanitization** | ✅ XSS Prevention | Custom utilities      |
-| **Password Security**  | ✅ Bcrypt hashing | Werkzeug + validation |
-
-### 🌐 **API Development**
-
-| API Type          | Features               | Documentation         |
-| ----------------- | ---------------------- | --------------------- |
-| **REST API**      | ✅ Full CRUD           | OpenAPI/Swagger       |
-| **GraphQL**       | ✅ Queries + Mutations | GraphQL Playground    |
-| **Serialization** | ✅ Marshmallow         | JSON serialization    |
-| **Pagination**    | ✅ Cursor + Offset     | Performance optimized |
-| **Versioning**    | ✅ URL versioning      | `/api/v1/`            |
-
-### ⚡ **Real-time Features**
-
-| Feature                | Technology     | Use Case             |
-| ---------------------- | -------------- | -------------------- |
-| **WebSockets**         | Flask-SocketIO | Live notifications   |
-| **Server-Sent Events** | Native Flask   | Activity feeds       |
-| **Background Tasks**   | Celery + Redis | Email sending        |
-| **Caching**            | Redis          | Query optimization   |
-| **Session Storage**    | Redis          | Distributed sessions |
-
-### 🧪 **Testing Strategy**
-
-| Test Type             | Coverage                  | Tools              |
-| --------------------- | ------------------------- | ------------------ |
-| **Unit Tests**        | ✅ 90%+                   | pytest + fixtures  |
-| **Integration Tests** | ✅ End-to-end             | Database + API     |
-| **API Tests**         | ✅ Automated              | Postman/Newman     |
-| **Frontend Tests**    | ✅ JavaScript             | Jest + DOM testing |
-| **Security Tests**    | ✅ Vulnerability scanning | Bandit + Safety    |
-
----
-
-## 🏗️ Detailed Project Structure
-
-```
-FlaskVerseHub/
-├── 📱 app/                           # Main application package
-│   ├── 🏭 __init__.py                 # App factory with blueprint registration
-│   ├── ⚙️ extensions.py              # Flask extensions initialization
-│   ├── 🗄️ models.py                  # SQLAlchemy database models
-│   ├── ⚙️ config.py                  # Environment-based configuration
-│   │
-│   ├── 📚 knowledge_vault/            # Knowledge management blueprint
-│   │   ├── 🛣️ routes.py               # CRUD operations and views
-│   │   ├── 📝 forms.py                # WTForms validation
-│   │   ├── 🎨 templates/              # Jinja2 templates
-│   │   ├── 🎨 static/                 # CSS, JS, images
-│   │   └── 🧪 tests/                  # Module-specific tests
-│   │
-│   ├── 🔌 api_hub/                   # REST + GraphQL APIs
-│   │   ├── 🛣️ rest_routes.py          # RESTful endpoints
-│   │   ├── 🔍 graphql_routes.py       # GraphQL schema and resolvers
-│   │   ├── 📄 serializers.py          # Data serialization
-│   │   ├── 📖 docs/                   # API documentation
-│   │   └── 🧪 tests/                  # API testing
-│   │
-│   ├── 📊 dashboard/                 # Real-time dashboard
-│   │   ├── 🛣️ routes.py               # Dashboard views
-│   │   ├── 🔗 sockets.py              # WebSocket handlers
-│   │   ├── 📊 events.py               # Real-time event management
-│   │   └── 🎨 templates/              # Dashboard UI
-│   │
-│   ├── 🔐 auth/                      # Authentication system
-│   │   ├── 🛣️ routes.py               # Auth endpoints
-│   │   ├── 📝 forms.py                # Login/registration forms
-│   │   ├── 🎫 jwt_utils.py            # JWT token management
-│   │   ├── 🛡️ decorators.py           # Auth decorators
-│   │   └── 🎨 templates/              # Auth UI templates
-│   │
-│   ├── 🔧 utils/                     # Shared utilities
-│   │   ├── 📧 email_utils.py          # Email sending
-│   │   ├── 💾 cache_utils.py          # Caching helpers
-│   │   ├── 🛡️ validation_utils.py     # Custom validators
-│   │   └── 📝 logger.py               # Logging configuration
-│   │
-│   ├── 🛡️ security/                  # Security utilities
-│   │   ├── 🔒 csrf_protection.py      # CSRF handling
-│   │   ├── 🔑 password_utils.py       # Password security
-│   │   ├── ⏰ rate_limiting.py        # Rate limiting
-│   │   └── 🧹 input_sanitization.py   # XSS prevention
-│   │
-│   ├── ❌ errors/                    # Error handling
-│   │   ├── 🛠️ handlers.py             # Global error handlers
-│   │   └── 🎨 templates/              # Error page templates
-│   │
-│   ├── 💻 cli/                       # Custom CLI commands
-│   │   ├── 🗄️ db_commands.py          # Database management
-│   │   └── 👤 user_commands.py        # User management
-│   │
-│   ├── 🎨 templates/                 # Global templates
-│   │   ├── 🏗️ base.html               # Master template
-│   │   ├── 📐 layout.html             # Common layout
-│   │   ├── 🔧 macros/                 # Reusable components
-│   │   └── 🔄 shared_components/      # Common UI elements
-│   │
-│   └── 🎨 static/                    # Global static files
-│       ├── 🎨 css/                    # Stylesheets
-│       ├── ⚡ js/                     # JavaScript files
-│       └── 🖼️ images/                 # Images and icons
-│
-├── 🧪 tests/                         # Comprehensive test suite
-│   ├── ⚙️ conftest.py                 # Pytest configuration
-│   ├── 🔧 test_config.py              # Configuration testing
-│   ├── 🗄️ test_models.py              # Model testing
-│   └── 🔄 integration/               # Integration tests
-│
-├── 📦 migrations/                    # Database migrations
-│   └── 📝 versions/                  # Migration files
-│
-├── 🐳 docker/                        # Container configuration
-│   ├── 🐳 Dockerfile                 # Application container
-│   └── 🔧 docker-compose.yml         # Multi-service setup
-│
-├── 📋 requirements/                  # Dependency management
-│   ├── 📦 base.txt                   # Core dependencies
-│   ├── 🛠️ dev.txt                    # Development tools
-│   ├── 🚀 prod.txt                   # Production packages
-│   └── 🧪 test.txt                   # Testing dependencies
-│
-├── 📜 scripts/                       # Utility scripts
-│   ├── ⚙️ setup_dev.sh               # Development setup
-│   ├── 🧪 run_tests.sh               # Test execution
-│   └── 🚀 deploy.sh                  # Deployment script
-│
-├── 🔄 .github/workflows/             # CI/CD pipelines
-│   ├── 🔧 ci.yml                     # Continuous Integration
-│   └── 🚀 cd.yml                     # Continuous Deployment
-│
-└── 📚 docs/                          # Documentation
-    ├── 📖 README.md                  # Project overview
-    ├── 🏗️ ARCHITECTURE.md            # System architecture
-    ├── 📋 API_REFERENCE.md           # API documentation
-    └── 🚀 DEPLOYMENT.md              # Deployment guide
-```
-
----
-
-## 🧪 Testing Comprehensive Suite
-
-### Running Tests
-
-```bash
-# Run all tests with coverage
-pytest --cov=app --cov-report=html --cov-report=term-missing
-
-# Run specific test categories
-pytest tests/unit/                    # Unit tests only
-pytest tests/integration/             # Integration tests
-pytest tests/api/                     # API tests
-pytest tests/security/                # Security tests
-
-# Run tests with specific markers
-pytest -m "slow"                      # Only slow tests
-pytest -m "not slow"                  # Skip slow tests
-pytest -m "security"                  # Security-related tests
-
-# Performance testing
-pytest tests/performance/ --benchmark-only
-```
-
-### Test Coverage Goals
-
-- **Unit Tests**: 95%+ coverage
-- **Integration Tests**: Critical user flows
-- **API Tests**: All endpoints tested
-- **Security Tests**: Vulnerability scanning
-- **Performance Tests**: Load and stress testing
-
----
-
-## 🐳 Docker Deployment
-
-### Development Environment
-
-```bash
-# Start development stack
-docker-compose -f docker/docker-compose.yml up --build
-
-# With hot reload
-docker-compose -f docker/docker-compose.dev.yml up
-```
-
-### Production Deployment
-
-```bash
-# Production stack with optimizations
-docker-compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up -d
-
-# Scale services
-docker-compose up --scale web=3 --scale worker=2
-```
-
-### Container Architecture
-
-- **Web Application**: Gunicorn + Nginx
-- **Database**: PostgreSQL with persistent volumes
-- **Cache/Sessions**: Redis cluster
-- **Background Tasks**: Celery workers
-- **Monitoring**: Prometheus + Grafana
-- **Reverse Proxy**: Nginx with SSL termination
-
----
-
-## 🔧 Development Workflow
-
-### Code Quality Standards
-
-```bash
-# Format code
-black app/ tests/
-isort app/ tests/
-
-# Lint code
-flake8 app/ tests/
-pylint app/
-
-# Type checking
-mypy app/
-
-# Security scanning
-bandit -r app/
-safety check
-```
-
-### Pre-commit Hooks
-
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Run hooks manually
-pre-commit run --all-files
-```
-
-### Git Workflow
-
-1. **Feature Branches**: `feature/your-feature-name`
-2. **Bugfix Branches**: `bugfix/issue-number`
-3. **Hotfix Branches**: `hotfix/critical-fix`
-4. **Pull Requests**: Required for main/develop
-5. **Code Review**: Mandatory before merge
-
----
-
-## 🚀 Deployment Options
-
-### 1. **Cloud Platforms**
-
-| Platform                      | Configuration         | Scaling            |
-| ----------------------------- | --------------------- | ------------------ |
-| **Heroku**                    | `Procfile` included   | Auto-scaling       |
-| **AWS ECS**                   | Docker containers     | Horizontal scaling |
-| **Google Cloud Run**          | Serverless containers | Pay-per-request    |
-| **Azure Container Instances** | Quick deployment      | Manual scaling     |
-| **DigitalOcean App Platform** | Git-based deployment  | Automatic          |
-
-### 2. **Traditional Hosting**
-
-- **VPS Deployment**: Ubuntu/CentOS with Nginx
-- **Shared Hosting**: cPanel with WSGI
-- **Dedicated Servers**: Full control setup
-
-### 3. **Container Orchestration**
-
-- **Kubernetes**: Production-grade orchestration
-- **Docker Swarm**: Simplified container management
-- **Nomad**: Lightweight orchestration
-
----
-
-## 📊 Performance & Monitoring
-
-### Performance Optimizations
-
-- **Database Indexing**: Optimized query performance
-- **Caching Strategy**: Redis for session and query caching
-- **Asset Optimization**: Minified CSS/JS, compressed images
-- **CDN Integration**: Static asset delivery
-- **Connection Pooling**: Database connection optimization
-
-### Monitoring Stack
-
-- **Application Monitoring**: Flask-APM integration
-- **Error Tracking**: Sentry error reporting
-- **Performance Metrics**: Prometheus + Grafana
-- **Log Aggregation**: ELK stack (Elasticsearch, Logstash, Kibana)
-- **Uptime Monitoring**: External health checks
-
-### Key Metrics Tracked
-
-- Response time and throughput
-- Database query performance
-- Memory and CPU usage
-- Error rates and types
-- User engagement metrics
-
----
-
-## 🤝 Contributing Guidelines
-
-### Getting Started
-
-1. **Fork the repository**
-2. **Create feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make changes** and add tests
-4. **Run test suite**: `pytest`
-5. **Commit changes**: `git commit -m 'Add amazing feature'`
-6. **Push to branch**: `git push origin feature/amazing-feature`
-7. **Open Pull Request**
-
-### Code Standards
-
-- Follow PEP 8 style guidelines
-- Write comprehensive docstrings
-- Add unit tests for new features
-- Update documentation as needed
-- Use conventional commit messages
-
-### Issue Reporting
-
-- Use issue templates provided
-- Include reproduction steps
-- Specify environment details
-- Add relevant labels
-
----
-
-## 🎓 Learning Path
-
-### 🌱 **Beginner (Weeks 1-2)**
-
-- [ ] Understand app factory pattern
-- [ ] Learn blueprint organization
-- [ ] Master template inheritance
-- [ ] Practice form handling with WTForms
-- [ ] Implement basic CRUD operations
-
-### 🌿 **Intermediate (Weeks 3-4)**
-
-- [ ] Database relationships and migrations
-- [ ] User authentication and sessions
-- [ ] API development (REST)
-- [ ] Error handling and logging
-- [ ] Basic testing strategies
-
-### 🌳 **Advanced (Weeks 5-6)**
-
-- [ ] GraphQL implementation
-- [ ] Real-time features with WebSockets
-- [ ] Caching strategies
-- [ ] Security best practices
-- [ ] Performance optimization
-
-### 🚀 **Expert (Weeks 7-8)**
-
-- [ ] Production deployment
-- [ ] Container orchestration
-- [ ] Monitoring and observability
-- [ ] CI/CD pipeline mastery
-- [ ] Scaling strategies
-
----
-
-## 📖 Additional Resources
-
-### 📚 **Documentation**
-
-- [Flask Official Documentation](https://flask.palletsprojects.com/)
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
-- [Flask-Login Documentation](https://flask-login.readthedocs.io/)
-- [Flask-SocketIO Documentation](https://flask-socketio.readthedocs.io/)
-
-### 🎥 **Video Tutorials**
-
-- Project walkthrough videos (coming soon)
-- Advanced concepts deep dives
-- Deployment demonstrations
-- Architecture explanation
-
-### 📝 **Blog Posts**
-
-- Flask best practices
-- Security implementation guides
-- Performance optimization tips
-- Production deployment strategies
-
----
-
-### Third-Party Licenses
-
-All dependencies and their licenses are documented in the `LICENSES` directory.
-
----
-
-## 🌟 Acknowledgments
-
-### Contributors
-
-- **Satvik Praveen** - Project Creator and Maintainer
-- Open to community contributions!
-
-### Inspiration
-
-- Flask community best practices
-- Real-world enterprise applications
-- Educational content creators
-- Open source Flask projects
-
-### Special Thanks
-
-- Flask development team
-- SQLAlchemy contributors
-- Testing framework developers
-- Documentation writers
-
----
-
-## 🔗 Connect & Support
-
-### 🌐 **Repository**
-
-- **GitHub**: https://github.com/SatvikPraveen/FlaskVerseHub
-- **Issues**: Report bugs and request features
-- **Discussions**: Ask questions and share ideas
-- **Wiki**: Extended documentation
-
-### 📧 **Contact**
-- **LinkedIn**: [SatvikPraveen](https://linkedin.com/in/satvikpraveen)
-
-
-### ⭐ **Support the Project**
-
-- **Star the repository** if you find it helpful
-- **Share with others** learning Flask
-- **Contribute** code, documentation, or ideas
-- **Report issues** to help improve the project
-
----
-
-## 🎯 Roadmap
-
-### 🚧 **Current Development**
-
-- [ ] Enhanced GraphQL subscriptions
-- [ ] Advanced caching strategies
-- [ ] Microservices architecture example
-- [ ] Machine learning integration
-
-### 🔮 **Future Plans**
-
-- [ ] Mobile API optimization
-- [ ] Kubernetes deployment templates
-- [ ] Advanced monitoring dashboard
-- [ ] Multi-tenant architecture
-- [ ] Internationalization (i18n)
-
-### 📈 **Version History**
-
-- **v1.0.0** - Initial release with core features
-- **v1.1.0** - GraphQL integration and WebSockets
-- **v1.2.0** - Enhanced security and testing
-- **v2.0.0** - Production deployment and CI/CD
-
----
-
-<div align="center">
-
-### 🚀 Ready to Master Flask?
-
-**FlaskVerseHub** is more than just a project—it's your complete journey from Flask beginner to expert.
-
-[🌟 **Star the Repo**](https://github.com/SatvikPraveen/FlaskVerseHub) • [📖 **Read the Docs**](https://github.com/SatvikPraveen/FlaskVerseHub/wiki) • [🤝 **Contribute**](https://github.com/SatvikPraveen/FlaskVerseHub/contribute) • [💬 **Join Discussion**](https://github.com/SatvikPraveen/FlaskVerseHub/discussions)
-
-**"Where Flask mastery begins and expert skills are forged"** ⚡
-
----
-
-_Made with ❤️ by developers, for developers_
-
-</div>
+Released under the [MIT License](LICENSE). Copyright © 2025–2026 Satvik Praveen.
