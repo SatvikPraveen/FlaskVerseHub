@@ -1,9 +1,11 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^(experiments/results/|.*\.svg$)
       - id: end-of-file-fixer
+        exclude: ^(experiments/results/|.*\.svg$)
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
@@ -11,15 +13,18 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.0
+    rev: v0.16.10
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: ["--fix"]
       - id: ruff-format
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+  # mypy runs from the project environment so it sees the real dependencies,
+  # exactly as CI does (`make install` provides it).
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies: ["types-redis", "types-PyYAML"]
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
         pass_filenames: false
-        args: ["--config-file=pyproject.toml"]

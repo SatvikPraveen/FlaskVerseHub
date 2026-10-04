@@ -235,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         config["seed"] = args.seed
     results = run(config)
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "results.json").write_text(json.dumps(results, indent=2))
+    (args.out / "results.json").write_text(json.dumps(results, indent=2) + "\n")
     (args.out / "REPORT.md").write_text(render_report(results))
     if not args.no_plot:
         plot(results, args.out / "ndcg.png")
