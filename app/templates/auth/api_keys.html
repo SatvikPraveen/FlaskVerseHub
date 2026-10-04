@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
+{% block title %}API keys · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 900px">
+  <h1 class="h3 mb-3">API keys</h1>
+  <p class="text-muted">Use a key as a Bearer token or <code>X-API-Key</code> header against <code>/api/v1</code>. Keys are stored hashed; the clear text is shown once.</p>
+  {% if new_key %}
+  <div class="alert alert-warning">
+    <strong>Your new key:</strong>
+    <code class="user-select-all d-block mt-1 fs-6">{{ new_key }}</code>
+  </div>
+  {% endif %}
+  <div class="row g-4">
+    <div class="col-md-5">
+      <div class="card"><div class="card-header fw-semibold">Generate a key</div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+            {{ render_field(form.name, placeholder="e.g. CI pipeline") }}
+            {{ render_field(form.scopes, size=3) }}
+            <button class="btn btn-primary" type="submit">Generate key</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card"><div class="card-header fw-semibold">Your keys</div>
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Used</th><th></th></tr></thead>
+          <tbody>
+          {% for key in keys %}
+            <tr class="{% if not key.is_usable %}text-muted{% endif %}">
+              <td>{{ key.name }}</td>
+              <td><code>{{ key.prefix }}…</code></td>
+              <td>{{ key.scopes|join(', ') }}</td>
+              <td class="small">{{ key.usage_count }}× · {{ key.last_used_at|timeago if key.last_used_at else 'never' }}</td>
+              <td class="text-end">
+                {% if key.is_usable %}
+                <form method="post" action="{{ url_for('auth.revoke_api_key', key_id=key.id) }}" data-confirm="Revoke this key?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <button class="btn btn-outline-danger btn-sm" type="submit">Revoke</button>
+                </form>
+                {% else %}<span class="badge text-bg-secondary">revoked</span>{% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-muted text-center py-3">No keys yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

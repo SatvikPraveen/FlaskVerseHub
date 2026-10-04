@@ -1,0 +1,23 @@
+{% extends "auth/_layout.html" %}
+{% from "macros/forms.html" import render_field %}
+{% block title %}Create account · {{ app_name }}{% endblock %}
+{% block heading %}Create your account{% endblock %}
+{% block subheading %}Join {{ app_name }} to write and bookmark knowledge.{% endblock %}
+{% block card %}
+<form method="post" novalidate>
+  {{ form.hidden_tag() }}
+  {{ render_field(form.username, autocomplete="username") }}
+  {{ render_field(form.email, autocomplete="email") }}
+  <div class="row">
+    <div class="col">{{ render_field(form.first_name, autocomplete="given-name") }}</div>
+    <div class="col">{{ render_field(form.last_name, autocomplete="family-name") }}</div>
+  </div>
+  {{ render_field(form.password, autocomplete="new-password", help="At least 10 characters with letters and numbers.") }}
+  {{ render_field(form.password_confirm, autocomplete="new-password") }}
+  {{ render_field(form.accept_terms) }}
+  <button class="btn btn-primary w-100" type="submit">Create account</button>
+</form>
+{% endblock %}
+{% block below %}
+<p class="text-center small text-muted mt-3">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+{% endblock %}

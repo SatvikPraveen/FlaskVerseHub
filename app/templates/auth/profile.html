@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
+{% block title %}Profile · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="row g-4">
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-body text-center">
+          <div class="user-avatar-sm mx-auto mb-2" style="width:4rem;height:4rem;font-size:1.6rem">{{ current_user.username[0]|upper }}</div>
+          <h1 class="h5 mb-0">{{ current_user.full_name }}</h1>
+          <p class="text-muted small mb-2">@{{ current_user.username }}</p>
+          <p class="small mb-2">
+            {% if current_user.is_admin %}<span class="badge text-bg-danger">admin</span>{% endif %}
+            {% for role in current_user.roles %}<span class="badge text-bg-secondary">{{ role.name }}</span>{% endfor %}
+          </p>
+          <p class="small text-muted mb-0">Member since {{ current_user.created_at|datetime('%b %Y') }}</p>
+          <p class="small mb-0">
+            {% if current_user.email_verified %}
+              <i class="fa-solid fa-circle-check text-success me-1"></i>Email verified
+            {% else %}
+              <i class="fa-solid fa-circle-exclamation text-warning me-1"></i>Email not verified
+              <form class="d-inline" method="post" action="{{ url_for('auth.resend_verification') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button class="btn btn-link btn-sm p-0 align-baseline" type="submit">Resend</button>
+              </form>
+            {% endif %}
+          </p>
+        </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between"><span>Knowledge items</span><strong>{{ item_count }}</strong></li>
+          <li class="list-group-item d-flex justify-content-between"><span>Sign-ins</span><strong>{{ current_user.login_count }}</strong></li>
+          <li class="list-group-item d-flex justify-content-between"><span>Last sign-in</span><span class="text-muted">{{ current_user.last_login|timeago }}</span></li>
+        </ul>
+      </div>
+      <div class="list-group">
+        <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="fa-solid fa-key me-2"></i>Change password</a>
+        <a class="list-group-item list-group-item-action" href="{{ url_for('auth.api_keys') }}"><i class="fa-solid fa-code me-2"></i>API keys</a>
+        <a class="list-group-item list-group-item-action text-danger" href="{{ url_for('auth.delete_account') }}"><i class="fa-solid fa-trash me-2"></i>Delete account</a>
+      </div>
+    </div>
+    <div class="col-lg-8">
+      <div class="card mb-4">
+        <div class="card-header fw-semibold">Edit profile</div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+            <div class="row">
+              <div class="col-md-6">{{ render_field(form.first_name) }}</div>
+              <div class="col-md-6">{{ render_field(form.last_name) }}</div>
+            </div>
+            {{ render_field(form.bio) }}
+            <div class="row">
+              <div class="col-md-6">{{ render_field(form.website, placeholder="https://") }}</div>
+              <div class="col-md-6">{{ render_field(form.location) }}</div>
+            </div>
+            {{ render_field(form.theme) }}
+            {{ render_field(form.email_notifications) }}
+            <button class="btn btn-primary" type="submit">Save profile</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header fw-semibold d-flex justify-content-between">
+          <span>Recent items</span>
+          {% if 'knowledge_vault.index' in url_map_endpoints %}<a class="small" href="{{ url_for('knowledge_vault.index', mine=1) }}">View all</a>{% endif %}
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for item in recent_items %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <a href="{{ url_for('knowledge_vault.detail', slug=item.slug) if 'knowledge_vault.detail' in url_map_endpoints else '#' }}">{{ item.title }}</a>
+            <span class="small text-muted">{{ item.updated_at|timeago }}{% if not item.is_public %} · <i class="fa-solid fa-lock"></i>{% endif %}</span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">You have not written anything yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

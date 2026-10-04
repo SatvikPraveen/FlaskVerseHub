@@ -1,0 +1,15 @@
+{% extends "auth/_layout.html" %}
+{% from "macros/forms.html" import render_field %}
+{% block title %}Delete account · {{ app_name }}{% endblock %}
+{% block heading %}Delete your account{% endblock %}
+{% block subheading %}This permanently removes your profile, items, comments and API keys.{% endblock %}
+{% block card %}
+<form method="post" novalidate data-confirm="Delete your account permanently? This cannot be undone.">
+  {{ form.hidden_tag() }}
+  {{ render_field(form.password, autocomplete="current-password") }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-danger" type="submit">Delete my account</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('auth.profile') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,5 @@
+Hi {{ user.username }},
+
+Please confirm your email address by opening this link (valid for three days):
+
+{{ verify_url }}

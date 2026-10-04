@@ -1,378 +1,133 @@
-# File: app/auth/forms.py
-# 🔐 Authentication Forms
+"""WTForms definitions for authentication and account management."""
+
+from __future__ import annotations
+
+import re
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, TextAreaField, SelectField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError, Optional
-from wtforms.fields import EmailField
+from wtforms import (
+    BooleanField,
+    PasswordField,
+    SelectField,
+    SelectMultipleField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+    URLField,
+)
+from wtforms.validators import (
+    URL,
+    DataRequired,
+    Email,
+    EqualTo,
+    Length,
+    Optional,
+    Regexp,
+    ValidationError,
+)
 
-from ..models import User
+USERNAME_RE = r"^[A-Za-z0-9_][A-Za-z0-9_.-]{2,63}$"
+PASSWORD_MIN = 10
+
+
+def strong_password(_form: FlaskForm, field: PasswordField) -> None:
+    """At least ``PASSWORD_MIN`` characters mixing letters and digits."""
+    value = field.data or ""
+    if len(value) < PASSWORD_MIN:
+        raise ValidationError(f"Use at least {PASSWORD_MIN} characters.")
+    if not re.search(r"[A-Za-z]", value) or not re.search(r"\d", value):
+        raise ValidationError("Mix letters and numbers.")
 
 
 class LoginForm(FlaskForm):
-    """User login form."""
-
-    username = StringField(
-        "Username or Email",
-        validators=[
-            DataRequired(message="Username or email is required"),
-            Length(min=3, max=80, message="Username must be between 3 and 80 characters"),
-        ],
-        render_kw={"placeholder": "Enter your username or email", "autocomplete": "username"},
+    identifier = StringField(
+        "Username or email",
+        validators=[DataRequired(), Length(max=255)],
+        render_kw={"autofocus": True},
     )
-
-    password = PasswordField(
-        "Password",
-        validators=[DataRequired(message="Password is required")],
-        render_kw={"placeholder": "Enter your password", "autocomplete": "current-password"},
-    )
-
-    remember_me = BooleanField("Remember me", default=False)
+    password = PasswordField("Password", validators=[DataRequired()])
+    remember_me = BooleanField("Keep me signed in")
+    submit = SubmitField("Sign in")
 
 
 class RegistrationForm(FlaskForm):
-    """User registration form."""
-
     username = StringField(
         "Username",
         validators=[
-            DataRequired(message="Username is required"),
-            Length(min=3, max=80, message="Username must be between 3 and 80 characters"),
+            DataRequired(),
+            Regexp(USERNAME_RE, message="3-64 characters: letters, digits, '_', '.', '-'."),
         ],
-        render_kw={"placeholder": "Choose a unique username", "autocomplete": "username"},
+        description="Public handle shown on your contributions.",
     )
-
-    email = EmailField(
-        "Email",
-        validators=[
-            DataRequired(message="Email is required"),
-            Email(message="Please enter a valid email address"),
-        ],
-        render_kw={"placeholder": "your@email.com", "autocomplete": "email"},
+    email = StringField("Email", validators=[DataRequired(), Email(), Length(max=255)])
+    first_name = StringField("First name", validators=[Optional(), Length(max=64)])
+    last_name = StringField("Last name", validators=[Optional(), Length(max=64)])
+    password = PasswordField("Password", validators=[DataRequired(), strong_password])
+    password_confirm = PasswordField(
+        "Confirm password", validators=[DataRequired(), EqualTo("password", "Passwords differ.")]
     )
-
-    first_name = StringField(
-        "First Name",
-        validators=[Optional(), Length(max=100, message="First name cannot exceed 100 characters")],
-        render_kw={"placeholder": "Your first name", "autocomplete": "given-name"},
+    accept_terms = BooleanField(
+        "I agree to the terms of use", validators=[DataRequired("You must accept the terms.")]
     )
-
-    last_name = StringField(
-        "Last Name",
-        validators=[Optional(), Length(max=100, message="Last name cannot exceed 100 characters")],
-        render_kw={"placeholder": "Your last name", "autocomplete": "family-name"},
-    )
-
-    password = PasswordField(
-        "Password",
-        validators=[
-            DataRequired(message="Password is required"),
-            Length(min=8, message="Password must be at least 8 characters long"),
-        ],
-        render_kw={"placeholder": "Create a strong password", "autocomplete": "new-password"},
-    )
-
-    confirm_password = PasswordField(
-        "Confirm Password",
-        validators=[
-            DataRequired(message="Please confirm your password"),
-            EqualTo("password", message="Passwords must match"),
-        ],
-        render_kw={"placeholder": "Confirm your password", "autocomplete": "new-password"},
-    )
-
-    agree_terms = BooleanField(
-        "I agree to the Terms of Service and Privacy Policy",
-        validators=[DataRequired(message="You must agree to the terms to register")],
-    )
-
-    def validate_username(self, username):
-        """Check if username is already taken."""
-        user = User.query.filter_by(username=username.data.lower()).first()
-        if user:
-            raise ValidationError("This username is already taken. Please choose a different one.")
-
-    def validate_email(self, email):
-        """Check if email is already registered."""
-        user = User.query.filter_by(email=email.data.lower()).first()
-        if user:
-            raise ValidationError(
-                "This email is already registered. Please use a different email or try logging in."
-            )
-
-
-class ResetPasswordRequestForm(FlaskForm):
-    """Password reset request form."""
-
-    email = EmailField(
-        "Email",
-        validators=[
-            DataRequired(message="Email is required"),
-            Email(message="Please enter a valid email address"),
-        ],
-        render_kw={"placeholder": "Enter your registered email", "autocomplete": "email"},
-    )
-
-    def validate_email(self, email):
-        """Check if email exists in system."""
-        user = User.query.filter_by(email=email.data.lower()).first()
-        if not user:
-            raise ValidationError("No account found with this email address.")
-
-
-class ResetPasswordForm(FlaskForm):
-    """Password reset form."""
-
-    password = PasswordField(
-        "New Password",
-        validators=[
-            DataRequired(message="Password is required"),
-            Length(min=8, message="Password must be at least 8 characters long"),
-        ],
-        render_kw={"placeholder": "Enter your new password", "autocomplete": "new-password"},
-    )
-
-    confirm_password = PasswordField(
-        "Confirm New Password",
-        validators=[
-            DataRequired(message="Please confirm your new password"),
-            EqualTo("password", message="Passwords must match"),
-        ],
-        render_kw={"placeholder": "Confirm your new password", "autocomplete": "new-password"},
-    )
-
-
-class ChangePasswordForm(FlaskForm):
-    """Change password form for authenticated users."""
-
-    current_password = PasswordField(
-        "Current Password",
-        validators=[DataRequired(message="Current password is required")],
-        render_kw={
-            "placeholder": "Enter your current password",
-            "autocomplete": "current-password",
-        },
-    )
-
-    new_password = PasswordField(
-        "New Password",
-        validators=[
-            DataRequired(message="New password is required"),
-            Length(min=8, message="Password must be at least 8 characters long"),
-        ],
-        render_kw={"placeholder": "Enter your new password", "autocomplete": "new-password"},
-    )
-
-    confirm_password = PasswordField(
-        "Confirm New Password",
-        validators=[
-            DataRequired(message="Please confirm your new password"),
-            EqualTo("new_password", message="Passwords must match"),
-        ],
-        render_kw={"placeholder": "Confirm your new password", "autocomplete": "new-password"},
-    )
+    submit = SubmitField("Create account")
 
 
 class ProfileForm(FlaskForm):
-    """User profile form."""
+    first_name = StringField("First name", validators=[Optional(), Length(max=64)])
+    last_name = StringField("Last name", validators=[Optional(), Length(max=64)])
+    bio = TextAreaField("Bio", validators=[Optional(), Length(max=1000)], render_kw={"rows": 4})
+    website = URLField("Website", validators=[Optional(), URL(), Length(max=255)])
+    location = StringField("Location", validators=[Optional(), Length(max=128)])
+    theme = SelectField("Theme", choices=[("light", "Light"), ("dark", "Dark")])
+    email_notifications = BooleanField("Email me about activity on my items")
+    submit = SubmitField("Save profile")
 
-    username = StringField(
-        "Username",
-        validators=[
-            DataRequired(message="Username is required"),
-            Length(min=3, max=80, message="Username must be between 3 and 80 characters"),
-        ],
-        render_kw={"placeholder": "Your username"},
+
+class ChangePasswordForm(FlaskForm):
+    current_password = PasswordField("Current password", validators=[DataRequired()])
+    new_password = PasswordField("New password", validators=[DataRequired(), strong_password])
+    confirm = PasswordField(
+        "Confirm new password",
+        validators=[DataRequired(), EqualTo("new_password", "Passwords differ.")],
     )
+    submit = SubmitField("Change password")
 
-    email = EmailField(
-        "Email",
-        validators=[
-            DataRequired(message="Email is required"),
-            Email(message="Please enter a valid email address"),
-        ],
-        render_kw={"placeholder": "your@email.com"},
+
+class PasswordResetRequestForm(FlaskForm):
+    identifier = StringField("Username or email", validators=[DataRequired(), Length(max=255)])
+    submit = SubmitField("Send reset link")
+
+
+class PasswordResetForm(FlaskForm):
+    password = PasswordField("New password", validators=[DataRequired(), strong_password])
+    confirm = PasswordField(
+        "Confirm password", validators=[DataRequired(), EqualTo("password", "Passwords differ.")]
     )
+    submit = SubmitField("Reset password")
 
-    first_name = StringField(
-        "First Name",
-        validators=[Optional(), Length(max=100, message="First name cannot exceed 100 characters")],
-        render_kw={"placeholder": "Your first name"},
+
+class ApiKeyForm(FlaskForm):
+    name = StringField("Key name", validators=[DataRequired(), Length(max=100)])
+    scopes = SelectMultipleField(
+        "Scopes",
+        choices=[("read", "Read"), ("write", "Write"), ("admin", "Admin")],
+        default=["read"],
     )
-
-    last_name = StringField(
-        "Last Name",
-        validators=[Optional(), Length(max=100, message="Last name cannot exceed 100 characters")],
-        render_kw={"placeholder": "Your last name"},
-    )
-
-    bio = TextAreaField(
-        "Bio",
-        validators=[Optional(), Length(max=500, message="Bio cannot exceed 500 characters")],
-        render_kw={"placeholder": "Tell us about yourself...", "rows": 4},
-    )
-
-    def __init__(self, original_username=None, original_email=None, *args, **kwargs):
-        super(ProfileForm, self).__init__(*args, **kwargs)
-        self.original_username = original_username
-        self.original_email = original_email
-
-    def validate_username(self, username):
-        """Check if username is available (excluding current user)."""
-        if username.data != self.original_username:
-            user = User.query.filter_by(username=username.data.lower()).first()
-            if user:
-                raise ValidationError("This username is already taken.")
-
-    def validate_email(self, email):
-        """Check if email is available (excluding current user)."""
-        if email.data != self.original_email:
-            user = User.query.filter_by(email=email.data.lower()).first()
-            if user:
-                raise ValidationError("This email is already registered.")
-
-
-class TwoFactorSetupForm(FlaskForm):
-    """Two-factor authentication setup form."""
-
-    token = StringField(
-        "Verification Code",
-        validators=[
-            DataRequired(message="Verification code is required"),
-            Length(min=6, max=6, message="Verification code must be 6 digits"),
-        ],
-        render_kw={"placeholder": "123456", "maxlength": 6, "autocomplete": "one-time-code"},
-    )
-
-
-class TwoFactorForm(FlaskForm):
-    """Two-factor authentication verification form."""
-
-    token = StringField(
-        "Authentication Code",
-        validators=[
-            DataRequired(message="Authentication code is required"),
-            Length(min=6, max=6, message="Authentication code must be 6 digits"),
-        ],
-        render_kw={"placeholder": "123456", "maxlength": 6, "autocomplete": "one-time-code"},
-    )
-
-    remember_device = BooleanField("Remember this device for 30 days", default=False)
-
-
-class AccountSettingsForm(FlaskForm):
-    """Account settings form."""
-
-    email_notifications = BooleanField(
-        "Email Notifications", default=True, description="Receive notifications via email"
-    )
-
-    marketing_emails = BooleanField(
-        "Marketing Emails", default=False, description="Receive marketing and promotional emails"
-    )
-
-    public_profile = BooleanField(
-        "Public Profile", default=True, description="Make your profile visible to other users"
-    )
-
-    show_email = BooleanField(
-        "Show Email", default=False, description="Display your email on your public profile"
-    )
-
-    timezone = SelectField(
-        "Timezone",
-        choices=[
-            ("UTC", "UTC"),
-            ("US/Eastern", "Eastern Time"),
-            ("US/Central", "Central Time"),
-            ("US/Mountain", "Mountain Time"),
-            ("US/Pacific", "Pacific Time"),
-            ("Europe/London", "London"),
-            ("Europe/Paris", "Paris"),
-            ("Europe/Berlin", "Berlin"),
-            ("Asia/Tokyo", "Tokyo"),
-            ("Asia/Shanghai", "Shanghai"),
-            ("Australia/Sydney", "Sydney"),
-        ],
-        default="UTC",
-    )
-
-    language = SelectField(
-        "Language",
-        choices=[
-            ("en", "English"),
-            ("es", "Español"),
-            ("fr", "Français"),
-            ("de", "Deutsch"),
-            ("zh", "中文"),
-        ],
-        default="en",
-    )
+    submit = SubmitField("Generate key")
 
 
 class DeleteAccountForm(FlaskForm):
-    """Account deletion confirmation form."""
-
-    password = PasswordField(
-        "Current Password",
-        validators=[DataRequired(message="Password is required to delete account")],
-        render_kw={"placeholder": "Enter your current password"},
-    )
-
-    confirmation = StringField(
-        'Type "DELETE" to confirm',
-        validators=[
-            DataRequired(message="Please type DELETE to confirm"),
-        ],
-        render_kw={"placeholder": "Type DELETE in capital letters"},
-    )
-
-    def validate_confirmation(self, confirmation):
-        """Validate deletion confirmation."""
-        if confirmation.data != "DELETE":
-            raise ValidationError('You must type "DELETE" exactly to confirm account deletion.')
+    password = PasswordField("Confirm your password", validators=[DataRequired()])
+    submit = SubmitField("Delete my account permanently")
 
 
-class AdminUserForm(FlaskForm):
-    """Admin form for managing users."""
-
-    username = StringField(
-        "Username", validators=[DataRequired(message="Username is required"), Length(min=3, max=80)]
-    )
-
-    email = EmailField(
-        "Email",
-        validators=[
-            DataRequired(message="Email is required"),
-            Email(message="Please enter a valid email address"),
-        ],
-    )
-
-    first_name = StringField("First Name", validators=[Optional(), Length(max=100)])
-
-    last_name = StringField("Last Name", validators=[Optional(), Length(max=100)])
-
-    is_active = BooleanField("Account Active", default=True)
-    is_admin = BooleanField("Administrator", default=False)
-
-    def __init__(self, user=None, *args, **kwargs):
-        super(AdminUserForm, self).__init__(*args, **kwargs)
-        self.user = user
-
-    def validate_username(self, username):
-        """Check username availability."""
-        if self.user and username.data == self.user.username:
-            return
-
-        user = User.query.filter_by(username=username.data.lower()).first()
-        if user:
-            raise ValidationError("Username already exists.")
-
-    def validate_email(self, email):
-        """Check email availability."""
-        if self.user and email.data == self.user.email:
-            return
-
-        user = User.query.filter_by(email=email.data.lower()).first()
-        if user:
-            raise ValidationError("Email already registered.")
+__all__ = [
+    "ApiKeyForm",
+    "ChangePasswordForm",
+    "DeleteAccountForm",
+    "LoginForm",
+    "PasswordResetForm",
+    "PasswordResetRequestForm",
+    "ProfileForm",
+    "RegistrationForm",
+]

@@ -97,9 +97,11 @@ def _init_extensions(app: Flask) -> None:
 
 
 def _register_blueprints(app: Flask) -> None:
+    from app.auth import bp as auth_bp
     from app.main import bp as main_bp
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp, url_prefix="/auth")
 
 
 def _register_infrastructure(app: Flask) -> None:

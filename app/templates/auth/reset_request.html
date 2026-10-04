@@ -1,0 +1,13 @@
+{% extends "auth/_layout.html" %}
+{% from "macros/forms.html" import render_field %}
+{% block title %}Reset password · {{ app_name }}{% endblock %}
+{% block heading %}Reset your password{% endblock %}
+{% block subheading %}We will email you a single-use link valid for one hour.{% endblock %}
+{% block card %}
+<form method="post" novalidate>
+  {{ form.hidden_tag() }}
+  {{ render_field(form.identifier) }}
+  <button class="btn btn-primary w-100" type="submit">Send reset link</button>
+</form>
+{% endblock %}
+{% block below %}<p class="text-center small mt-3"><a href="{{ url_for('auth.login') }}">Back to sign in</a></p>{% endblock %}

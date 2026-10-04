@@ -56,6 +56,33 @@ def _register_test_routes(application: Flask) -> None:
     def _crash() -> NoReturn:
         raise RuntimeError("boom")
 
+    from app.auth.decorators import (
+        admin_required,
+        permission_required,
+        role_required,
+        verified_required,
+    )
+
+    @application.get("/_test/admin")
+    @admin_required
+    def _admin() -> str:
+        return "admin ok"
+
+    @application.get("/_test/role")
+    @role_required("editor", "moderator")
+    def _role() -> str:
+        return "role ok"
+
+    @application.get("/_test/perm")
+    @permission_required("items:edit_any")
+    def _perm() -> str:
+        return "perm ok"
+
+    @application.get("/_test/verified")
+    @verified_required
+    def _verified() -> str:
+        return "verified ok"
+
 
 @pytest.fixture
 def db(app: Flask) -> Generator[Any, None, None]:
