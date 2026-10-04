@@ -1,127 +1,85 @@
-# File: app/knowledge_vault/forms.py
-# 📚 Knowledge Vault Forms for Validation
+from __future__ import annotations
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, SelectField, FileField, BooleanField
-from wtforms.validators import DataRequired, Length, Optional, URL
-from flask_wtf.file import FileField, FileAllowed
+from wtforms import (
+    BooleanField,
+    HiddenField,
+    SelectField,
+    SelectMultipleField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+    URLField,
+)
+from wtforms.validators import URL, DataRequired, Length, Optional
+
+from app.models import Difficulty, ItemStatus
 
 
-class KnowledgeEntryForm(FlaskForm):
-    """Form for creating and editing knowledge vault entries."""
-
-    title = StringField(
-        "Title",
-        validators=[
-            DataRequired(message="Title is required"),
-            Length(min=3, max=200, message="Title must be between 3 and 200 characters"),
-        ],
-        render_kw={"placeholder": "Enter knowledge entry title"},
+class KnowledgeItemForm(FlaskForm):
+    title = StringField("Title", validators=[DataRequired(), Length(min=3, max=200)])
+    summary = StringField(
+        "Summary",
+        validators=[Optional(), Length(max=500)],
+        description="One or two sentences shown in listings and search results.",
     )
-
-    description = TextAreaField(
-        "Description",
-        validators=[
-            Optional(),
-            Length(max=500, message="Description cannot exceed 500 characters"),
-        ],
-        render_kw={"placeholder": "Brief description of this knowledge entry", "rows": 3},
-    )
-
     content = TextAreaField(
         "Content",
-        validators=[
-            DataRequired(message="Content is required"),
-            Length(min=10, message="Content must be at least 10 characters long"),
-        ],
-        render_kw={"placeholder": "Enter the knowledge content here...", "rows": 15},
+        validators=[DataRequired(), Length(min=10)],
+        render_kw={"rows": 16},
+        description="Basic HTML is allowed and sanitised on save.",
     )
-
-    category = SelectField(
-        "Category",
-        choices=[
-            ("general", "General"),
-            ("technical", "Technical"),
-            ("business", "Business"),
-            ("research", "Research"),
-            ("documentation", "Documentation"),
-            ("tutorial", "Tutorial"),
-            ("reference", "Reference"),
-        ],
-        validators=[DataRequired(message="Please select a category")],
-    )
-
+    category_id = SelectField("Category", coerce=int, validators=[Optional()])
     tags = StringField(
         "Tags",
-        validators=[Optional(), Length(max=200, message="Tags cannot exceed 200 characters")],
-        render_kw={"placeholder": "Comma-separated tags (e.g., python, flask, web-development)"},
+        validators=[Optional(), Length(max=300)],
+        description="Comma-separated, e.g. flask, sqlalchemy",
     )
-
-    source_url = StringField(
-        "Source URL",
-        validators=[Optional(), URL(message="Please enter a valid URL")],
-        render_kw={"placeholder": "https://example.com/source"},
+    difficulty = SelectField(
+        "Difficulty",
+        choices=[(d.value, d.value.title()) for d in Difficulty],
+        default=Difficulty.INTERMEDIATE.value,
     )
-
-    attachment = FileField(
-        "Attachment",
-        validators=[
-            Optional(),
-            FileAllowed(
-                ["pdf", "doc", "docx", "txt", "md"],
-                "Only PDF, DOC, DOCX, TXT, and MD files allowed",
-            ),
-        ],
+    status = SelectField(
+        "Status",
+        choices=[(s.value, s.value.title()) for s in ItemStatus],
+        default=ItemStatus.PUBLISHED.value,
     )
-
-    is_public = BooleanField("Make this entry public", default=False)
-
-    is_featured = BooleanField("Feature this entry", default=False)
-
-
-class SearchForm(FlaskForm):
-    """Form for searching knowledge vault entries."""
-
-    query = StringField(
-        "Search Query",
-        validators=[
-            DataRequired(message="Search query is required"),
-            Length(min=1, max=100, message="Search query must be between 1 and 100 characters"),
-        ],
-        render_kw={"placeholder": "Search knowledge vault...", "class": "form-control"},
+    source_url = URLField("Source URL", validators=[Optional(), URL(), Length(max=512)])
+    is_public = BooleanField("Public (visible to everyone)", default=True)
+    is_featured = BooleanField("Featured on the home page")
+    change_note = StringField(
+        "Change note",
+        validators=[Optional(), Length(max=255)],
+        description="Why did you edit this? (kept in history)",
     )
+    submit = SubmitField("Save")
 
-    category = SelectField(
-        "Category",
-        choices=[
-            ("", "All Categories"),
-            ("general", "General"),
-            ("technical", "Technical"),
-            ("business", "Business"),
-            ("research", "Research"),
-            ("documentation", "Documentation"),
-            ("tutorial", "Tutorial"),
-            ("reference", "Reference"),
-        ],
-        validators=[Optional()],
+
+class CommentForm(FlaskForm):
+    body = TextAreaField(
+        "Comment", validators=[DataRequired(), Length(min=1, max=5000)], render_kw={"rows": 3}
     )
+    parent_id = HiddenField()
+    submit = SubmitField("Post comment")
 
 
-class BulkDeleteForm(FlaskForm):
-    """Form for bulk operations."""
-
-    entry_ids = StringField(
-        "Entry IDs", validators=[DataRequired(message="Entry IDs are required")]
-    )
-
+class BulkActionForm(FlaskForm):
     action = SelectField(
         "Action",
         choices=[
-            ("delete", "Delete"),
+            ("publish", "Publish"),
             ("archive", "Archive"),
-            ("unarchive", "Unarchive"),
-            ("make_public", "Make Public"),
-            ("make_private", "Make Private"),
+            ("make_public", "Make public"),
+            ("make_private", "Make private"),
+            ("feature", "Feature"),
+            ("unfeature", "Unfeature"),
+            ("delete", "Delete"),
         ],
-        validators=[DataRequired(message="Please select an action")],
+        validators=[DataRequired()],
     )
+    item_ids = SelectMultipleField("Items", coerce=int, validate_choice=False)
+    submit = SubmitField("Apply")
+
+
+__all__ = ["BulkActionForm", "CommentForm", "KnowledgeItemForm"]

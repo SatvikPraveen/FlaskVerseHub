@@ -1,345 +1,259 @@
-# File: app/knowledge_vault/routes.py
-# 📚 Knowledge Vault CRUD Routes
+from __future__ import annotations
 
-from flask import render_template, request, redirect, url_for, flash, abort, jsonify, current_app
-from flask_login import login_required, current_user
-from sqlalchemy import or_, desc, asc
-from werkzeug.utils import secure_filename
-import os
-from datetime import datetime
+from typing import Any
 
-from . import knowledge_vault
-from .forms import KnowledgeEntryForm, SearchForm, BulkDeleteForm
-from ..models import KnowledgeEntry, db
-from ..utils.cache_utils import cache
-from ..auth.decorators import role_required
+from flask import abort, flash, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+from sqlalchemy import func, select
+from werkzeug.wrappers import Response
+
+from app.extensions import db
+from app.knowledge_vault import bp, service
+from app.knowledge_vault.forms import BulkActionForm, CommentForm, KnowledgeItemForm
+from app.models import Bookmark, Category, Comment, KnowledgeItem, KnowledgeItemRevision, Tag
+from app.utils.diff import inline_diff
+from app.utils.pagination import page_args, paginate
 
 
-@knowledge_vault.route("/")
-@knowledge_vault.route("/index")
-def index():
-    """Knowledge vault main page with pagination and search."""
-    page = request.args.get("page", 1, type=int)
-    per_page = current_app.config.get("POSTS_PER_PAGE", 10)
+def _viewer() -> Any:
+    return current_user if current_user.is_authenticated else None
 
-    search_form = SearchForm()
-    query = request.args.get("query", "")
-    category = request.args.get("category", "")
-    sort_by = request.args.get("sort", "created_desc")
 
-    # Build the query
-    entries_query = KnowledgeEntry.query
+def _populate_categories(form: KnowledgeItemForm) -> None:
+    categories = db.session.scalars(select(Category).order_by(Category.name)).all()
+    form.category_id.choices = [(0, "— none —"), *[(c.id, c.name) for c in categories]]
 
-    # Apply search filter
-    if query:
-        entries_query = entries_query.filter(
-            or_(
-                KnowledgeEntry.title.contains(query),
-                KnowledgeEntry.content.contains(query),
-                KnowledgeEntry.tags.contains(query),
-            )
-        )
 
-    # Apply category filter
-    if category:
-        entries_query = entries_query.filter(KnowledgeEntry.category == category)
+def _item_or_404(slug: str) -> KnowledgeItem:
+    item = service.get_by_slug(slug, user=_viewer())
+    if item is None:
+        abort(404, description="That knowledge item does not exist or you may not view it.")
+    return item
 
-    # Only show public entries for non-authenticated users
-    if not current_user.is_authenticated:
-        entries_query = entries_query.filter(KnowledgeEntry.is_public == True)
 
-    # Apply sorting
-    if sort_by == "created_asc":
-        entries_query = entries_query.order_by(asc(KnowledgeEntry.created_at))
-    elif sort_by == "title_asc":
-        entries_query = entries_query.order_by(asc(KnowledgeEntry.title))
-    elif sort_by == "title_desc":
-        entries_query = entries_query.order_by(desc(KnowledgeEntry.title))
-    else:  # default: created_desc
-        entries_query = entries_query.order_by(desc(KnowledgeEntry.created_at))
+def _editable_or_403(slug: str) -> KnowledgeItem:
+    item = _item_or_404(slug)
+    if not service.can_edit(item, current_user):
+        abort(403, description="You may only edit your own items.")
+    return item
 
-    # Paginate results
-    entries = entries_query.paginate(page=page, per_page=per_page, error_out=False)
 
-    # Get featured entries
-    featured_entries = KnowledgeEntry.query.filter_by(is_featured=True).limit(5).all()
-
+@bp.get("/")
+def index() -> str:
+    filters = service.ItemFilters.from_args(request.args, user=_viewer())
+    page, per_page = page_args()
+    listing = paginate(service.build_listing(filters, user=_viewer()), page, per_page)
+    categories = db.session.scalars(select(Category).order_by(Category.name)).all()
+    popular_tags = db.session.execute(
+        select(Tag, func.count(KnowledgeItem.id).label("n"))
+        .join(Tag.items)
+        .group_by(Tag.id)
+        .order_by(func.count(KnowledgeItem.id).desc(), Tag.name)
+        .limit(20)
+    ).all()
+    bulk_form = BulkActionForm() if current_user.is_authenticated else None
     return render_template(
-        "knowledge_vault/vault_index.html",
-        entries=entries,
-        search_form=search_form,
-        query=query,
-        category=category,
-        sort_by=sort_by,
-        featured_entries=featured_entries,
+        "vault/index.html",
+        page=listing,
+        filters=filters,
+        categories=categories,
+        popular_tags=popular_tags,
+        sort_options=list(service.SORT_OPTIONS),
+        bulk_form=bulk_form,
     )
 
 
-@knowledge_vault.route("/entry/<int:id>")
-def detail(id):
-    """Display a single knowledge entry."""
-    entry = KnowledgeEntry.query.get_or_404(id)
+@bp.route("/new", methods=["GET", "POST"])
+@login_required
+def create() -> Response | str:
+    form = KnowledgeItemForm()
+    _populate_categories(form)
+    if form.validate_on_submit():
+        item = service.create_item(form.data, author=current_user)
+        flash("Knowledge item created.", "success")
+        return redirect(url_for("knowledge_vault.detail", slug=item.slug))
+    return render_template("vault/form.html", form=form, item=None)
 
-    # Check if user can view this entry
-    if not entry.is_public and (not current_user.is_authenticated or entry.author != current_user):
-        abort(403)
 
-    # Get related entries by category or tags
-    related_entries = (
-        KnowledgeEntry.query.filter(
-            KnowledgeEntry.id != entry.id,
-            or_(
-                KnowledgeEntry.category == entry.category,
-                KnowledgeEntry.tags.contains(entry.tags.split(",")[0] if entry.tags else ""),
-            ),
+@bp.get("/<slug>")
+def detail(slug: str) -> str:
+    item = _item_or_404(slug)
+    service.record_view(item)
+    comments = item.comments.filter(Comment.parent_id.is_(None)).all()
+    related = db.session.scalars(
+        KnowledgeItem.visible_to(_viewer())
+        .where(KnowledgeItem.id != item.id)
+        .where(
+            (KnowledgeItem.category_id == item.category_id)
+            | KnowledgeItem.tags.any(Tag.id.in_([t.id for t in item.tags] or [0]))
         )
-        .filter_by(is_public=True)
-        .limit(5)
-        .all()
-    )
-
+        .order_by(KnowledgeItem.view_count.desc())
+        .limit(4)
+    ).all()
     return render_template(
-        "knowledge_vault/vault_detail.html", entry=entry, related_entries=related_entries
+        "vault/detail.html",
+        item=item,
+        comments=comments,
+        related=related,
+        comment_form=CommentForm(),
+        can_edit=service.can_edit(item, _viewer()),
+        bookmarked=service.is_bookmarked(item, _viewer()),
+        bookmark_count=item.bookmarks.count(),
     )
 
 
-@knowledge_vault.route("/create", methods=["GET", "POST"])
+@bp.route("/<slug>/edit", methods=["GET", "POST"])
 @login_required
-def create():
-    """Create a new knowledge entry."""
-    form = KnowledgeEntryForm()
-
+def edit(slug: str) -> Response | str:
+    item = _editable_or_403(slug)
+    form = KnowledgeItemForm(obj=item)
+    _populate_categories(form)
+    if request.method == "GET":
+        form.tags.data = ", ".join(item.tag_names)
+        form.category_id.data = item.category_id or 0
+        form.difficulty.data = item.difficulty.value
+        form.status.data = item.status.value
     if form.validate_on_submit():
-        # Handle file upload
-        filename = None
-        if form.attachment.data:
-            filename = secure_filename(form.attachment.data.filename)
-            upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], "vault", filename)
-            os.makedirs(os.path.dirname(upload_path), exist_ok=True)
-            form.attachment.data.save(upload_path)
+        service.update_item(item, form.data, actor=current_user, note=form.change_note.data or None)
+        flash("Changes saved.", "success")
+        return redirect(url_for("knowledge_vault.detail", slug=item.slug))
+    return render_template("vault/form.html", form=form, item=item)
 
-        # Create new entry
-        entry = KnowledgeEntry(
-            title=form.title.data,
-            description=form.description.data,
-            content=form.content.data,
-            category=form.category.data,
-            tags=form.tags.data,
-            source_url=form.source_url.data,
-            attachment_filename=filename,
-            is_public=form.is_public.data,
-            is_featured=form.is_featured.data,
-            author_id=current_user.id,
+
+@bp.post("/<slug>/delete")
+@login_required
+def delete(slug: str) -> Response:
+    item = _editable_or_403(slug)
+    service.delete_item(item, actor=current_user)
+    flash("Knowledge item deleted.", "info")
+    return redirect(url_for("knowledge_vault.index"))
+
+
+@bp.get("/<slug>/history")
+def history(slug: str) -> str:
+    item = _item_or_404(slug)
+    revisions = item.revisions.all()
+    return render_template("vault/history.html", item=item, revisions=revisions)
+
+
+@bp.get("/<slug>/history/<int:version>")
+def revision(slug: str, version: int) -> str:
+    item = _item_or_404(slug)
+    rev = item.revisions.filter(KnowledgeItemRevision.version == version).first()
+    if rev is None:
+        abort(404)
+    newer = item.revisions.filter(KnowledgeItemRevision.version == version + 1).first()
+    newer_title, newer_content = (
+        (newer.title, newer.content) if newer else (item.title, item.content)
+    )
+    return render_template(
+        "vault/revision.html",
+        item=item,
+        revision=rev,
+        title_diff=inline_diff(rev.title, newer_title),
+        content_diff=inline_diff(rev.content, newer_content),
+        compared_to=newer.version if newer else item.version,
+        can_edit=service.can_edit(item, _viewer()),
+    )
+
+
+@bp.post("/<slug>/history/<int:version>/restore")
+@login_required
+def restore(slug: str, version: int) -> Response:
+    item = _editable_or_403(slug)
+    rev = item.revisions.filter(KnowledgeItemRevision.version == version).first()
+    if rev is None:
+        abort(404)
+    service.restore_revision(item, rev, actor=current_user)
+    flash(f"Restored version {version}.", "success")
+    return redirect(url_for("knowledge_vault.detail", slug=item.slug))
+
+
+@bp.post("/<slug>/bookmark")
+@login_required
+def bookmark(slug: str) -> Response:
+    item = _item_or_404(slug)
+    now_bookmarked = service.toggle_bookmark(item, user=current_user)
+    if request.accept_mimetypes.best == "application/json" or request.is_json:
+        return jsonify({"bookmarked": now_bookmarked, "count": item.bookmarks.count()})
+    flash("Bookmarked." if now_bookmarked else "Bookmark removed.", "info")
+    return redirect(url_for("knowledge_vault.detail", slug=item.slug))
+
+
+@bp.get("/bookmarks")
+@login_required
+def bookmarks() -> str:
+    page, per_page = page_args()
+    stmt = (
+        select(KnowledgeItem)
+        .join(Bookmark, Bookmark.item_id == KnowledgeItem.id)
+        .where(Bookmark.user_id == current_user.id)
+        .order_by(Bookmark.created_at.desc())
+    )
+    return render_template("vault/bookmarks.html", page=paginate(stmt, page, per_page))
+
+
+@bp.post("/<slug>/comments")
+@login_required
+def add_comment(slug: str) -> Response:
+    item = _item_or_404(slug)
+    form = CommentForm()
+    if form.validate_on_submit():
+        parent_id = int(form.parent_id.data) if (form.parent_id.data or "").isdigit() else None
+        comment = service.add_comment(
+            item, form.body.data or "", author=current_user, parent_id=parent_id
         )
-
-        try:
-            db.session.add(entry)
-            db.session.commit()
-            flash("Knowledge entry created successfully!", "success")
-            return redirect(url_for("knowledge_vault.detail", id=entry.id))
-        except Exception as e:
-            db.session.rollback()
-            flash("Error creating knowledge entry. Please try again.", "error")
-            current_app.logger.error(f"Error creating knowledge entry: {e}")
-
-    return render_template("knowledge_vault/vault_create.html", form=form)
+        flash("Comment posted.", "success")
+        return redirect(
+            url_for("knowledge_vault.detail", slug=item.slug) + f"#comment-{comment.id}"
+        )
+    flash("Comment cannot be empty.", "danger")
+    return redirect(url_for("knowledge_vault.detail", slug=item.slug) + "#comments")
 
 
-@knowledge_vault.route("/edit/<int:id>", methods=["GET", "POST"])
+@bp.post("/comments/<int:comment_id>/delete")
 @login_required
-def edit(id):
-    """Edit a knowledge entry."""
-    entry = KnowledgeEntry.query.get_or_404(id)
-
-    # Check if user can edit this entry
-    if entry.author != current_user and not current_user.is_admin:
-        abort(403)
-
-    form = KnowledgeEntryForm(obj=entry)
-
-    if form.validate_on_submit():
-        # Handle file upload
-        if form.attachment.data:
-            filename = secure_filename(form.attachment.data.filename)
-            upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], "vault", filename)
-            os.makedirs(os.path.dirname(upload_path), exist_ok=True)
-            form.attachment.data.save(upload_path)
-            entry.attachment_filename = filename
-
-        # Update entry
-        form.populate_obj(entry)
-        entry.updated_at = datetime.utcnow()
-
-        try:
-            db.session.commit()
-            flash("Knowledge entry updated successfully!", "success")
-            return redirect(url_for("knowledge_vault.detail", id=entry.id))
-        except Exception as e:
-            db.session.rollback()
-            flash("Error updating knowledge entry. Please try again.", "error")
-            current_app.logger.error(f"Error updating knowledge entry: {e}")
-
-    return render_template("knowledge_vault/vault_edit.html", form=form, entry=entry)
-
-
-@knowledge_vault.route("/delete/<int:id>", methods=["POST"])
-@login_required
-def delete(id):
-    """Delete a knowledge entry."""
-    entry = KnowledgeEntry.query.get_or_404(id)
-
-    # Check if user can delete this entry
-    if entry.author != current_user and not current_user.is_admin:
-        abort(403)
-
+def delete_comment(comment_id: int) -> Response:
+    comment = db.session.get(Comment, comment_id)
+    if comment is None:
+        abort(404)
     try:
-        # Delete associated file if exists
-        if entry.attachment_filename:
-            file_path = os.path.join(
-                current_app.config["UPLOAD_FOLDER"], "vault", entry.attachment_filename
-            )
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-        db.session.delete(entry)
-        db.session.commit()
-        flash("Knowledge entry deleted successfully!", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash("Error deleting knowledge entry. Please try again.", "error")
-        current_app.logger.error(f"Error deleting knowledge entry: {e}")
-
-    return redirect(url_for("knowledge_vault.index"))
+        service.delete_comment(comment, actor=current_user)
+    except service.PermissionDeniedError:
+        abort(403)
+    flash("Comment removed.", "info")
+    return redirect(url_for("knowledge_vault.detail", slug=comment.item.slug) + "#comments")
 
 
-@knowledge_vault.route("/bulk-actions", methods=["POST"])
+@bp.post("/bulk")
 @login_required
-@role_required("admin")
-def bulk_actions():
-    """Handle bulk actions on knowledge entries."""
-    form = BulkDeleteForm()
-
-    if form.validate_on_submit():
-        entry_ids = [
-            int(id.strip()) for id in form.entry_ids.data.split(",") if id.strip().isdigit()
-        ]
-        action = form.action.data
-
-        entries = KnowledgeEntry.query.filter(KnowledgeEntry.id.in_(entry_ids)).all()
-
-        try:
-            if action == "delete":
-                for entry in entries:
-                    if entry.attachment_filename:
-                        file_path = os.path.join(
-                            current_app.config["UPLOAD_FOLDER"], "vault", entry.attachment_filename
-                        )
-                        if os.path.exists(file_path):
-                            os.remove(file_path)
-                    db.session.delete(entry)
-            elif action == "make_public":
-                for entry in entries:
-                    entry.is_public = True
-            elif action == "make_private":
-                for entry in entries:
-                    entry.is_public = False
-
-            db.session.commit()
-            flash(
-                f'Bulk action "{action}" completed successfully on {len(entries)} entries!',
-                "success",
-            )
-        except Exception as e:
-            db.session.rollback()
-            flash("Error performing bulk action. Please try again.", "error")
-            current_app.logger.error(f"Error in bulk action: {e}")
-
-    return redirect(url_for("knowledge_vault.index"))
+def bulk() -> Response:
+    form = BulkActionForm()
+    if not form.validate_on_submit() or not form.item_ids.data:
+        flash("Select at least one item and an action.", "warning")
+        return redirect(url_for("knowledge_vault.index"))
+    count = service.bulk_action(form.action.data, form.item_ids.data, actor=current_user)
+    flash(f"Applied “{form.action.data.replace('_', ' ')}” to {count} item(s).", "success")
+    return redirect(request.referrer or url_for("knowledge_vault.index"))
 
 
-@knowledge_vault.route("/api/entries")
-@cache.cached(timeout=300)
-def api_entries():
-    """API endpoint for knowledge entries (JSON)."""
-    page = request.args.get("page", 1, type=int)
-    per_page = min(request.args.get("per_page", 10, type=int), 100)
-
-    entries = KnowledgeEntry.query.filter_by(is_public=True).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-
-    return jsonify(
-        {
-            "entries": [
-                {
-                    "id": entry.id,
-                    "title": entry.title,
-                    "description": entry.description,
-                    "category": entry.category,
-                    "tags": entry.tags.split(",") if entry.tags else [],
-                    "created_at": entry.created_at.isoformat(),
-                    "author": entry.author.username if entry.author else "Unknown",
-                }
-                for entry in entries.items
-            ],
-            "pagination": {
-                "page": entries.page,
-                "pages": entries.pages,
-                "per_page": entries.per_page,
-                "total": entries.total,
-                "has_next": entries.has_next,
-                "has_prev": entries.has_prev,
-            },
-        }
-    )
+@bp.get("/<slug>/export.<fmt>")
+def export(slug: str, fmt: str) -> Response:
+    if fmt not in {"json", "md"}:
+        abort(404)
+    item = _item_or_404(slug)
+    body, mimetype = service.export_item(item, fmt)
+    response = Response(body, mimetype=mimetype)
+    response.headers["Content-Disposition"] = f'attachment; filename="{item.slug}.{fmt}"'
+    return response
 
 
-@knowledge_vault.route("/categories")
-def categories():
-    """Get available categories with entry counts."""
-    categories = (
-        db.session.query(KnowledgeEntry.category, db.func.count(KnowledgeEntry.id).label("count"))
-        .filter_by(is_public=True)
-        .group_by(KnowledgeEntry.category)
-        .all()
-    )
-
-    return jsonify({"categories": [{"name": cat, "count": count} for cat, count in categories]})
-
-
-@knowledge_vault.route("/search-suggestions")
-def search_suggestions():
-    """Get search suggestions based on query."""
-    query = request.args.get("q", "").lower()
-    if not query or len(query) < 2:
-        return jsonify({"suggestions": []})
-
-    # Get title suggestions
-    titles = (
-        KnowledgeEntry.query.filter(
-            KnowledgeEntry.title.contains(query), KnowledgeEntry.is_public == True
-        )
-        .limit(5)
-        .all()
-    )
-
-    suggestions = [{"text": entry.title, "type": "title"} for entry in titles]
-
-    # Get tag suggestions
-    all_tags = (
-        db.session.query(KnowledgeEntry.tags)
-        .filter(KnowledgeEntry.tags.isnot(None), KnowledgeEntry.is_public == True)
-        .all()
-    )
-
-    tag_suggestions = []
-    for tag_string in all_tags:
-        if tag_string[0]:
-            tags = [tag.strip().lower() for tag in tag_string[0].split(",")]
-            tag_suggestions.extend(
-                [tag for tag in tags if query in tag and len(tag_suggestions) < 5]
-            )
-
-    suggestions.extend([{"text": tag, "type": "tag"} for tag in set(tag_suggestions)])
-
-    return jsonify({"suggestions": suggestions[:10]})
+@bp.get("/categories")
+def categories() -> str:
+    rows = db.session.execute(
+        select(Category, func.count(KnowledgeItem.id))
+        .outerjoin(KnowledgeItem, KnowledgeItem.category_id == Category.id)
+        .group_by(Category.id)
+        .order_by(Category.name)
+    ).all()
+    return render_template("vault/categories.html", rows=rows)

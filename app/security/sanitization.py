@@ -19,7 +19,7 @@ ALLOWED_TAGS: frozenset[str] = frozenset(
 )  # fmt: skip
 
 ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
-    "a": {"href", "title", "rel"},
+    "a": {"href", "title"},
     "img": {"src", "alt", "title", "width", "height"},
     "code": {"class"},
     "pre": {"class"},

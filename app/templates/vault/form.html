@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
+{% block title %}{{ 'Edit' if item else 'New' }} item · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <nav aria-label="breadcrumb"><ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.index') }}">Knowledge Vault</a></li>
+    {% if item %}<li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.detail', slug=item.slug) }}">{{ item.title }}</a></li>{% endif %}
+    <li class="breadcrumb-item active">{{ 'Edit' if item else 'New item' }}</li>
+  </ol></nav>
+  <h1 class="h3 mb-3">{{ 'Edit “' ~ item.title ~ '”' if item else 'Create a knowledge item' }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="row g-4">
+      <div class="col-lg-8">
+        {{ render_field(form.title, placeholder="A clear, specific title") }}
+        {{ render_field(form.summary) }}
+        {{ render_field(form.content) }}
+        {% if item %}{{ render_field(form.change_note, placeholder="e.g. Fixed code sample") }}{% endif %}
+      </div>
+      <div class="col-lg-4">
+        <div class="card"><div class="card-body">
+          {{ render_field(form.category_id) }}
+          {{ render_field(form.tags, placeholder="flask, sqlalchemy") }}
+          {{ render_field(form.difficulty) }}
+          {{ render_field(form.status) }}
+          {{ render_field(form.source_url, placeholder="https://") }}
+          {{ render_field(form.is_public) }}
+          {% if current_user.is_admin %}{{ render_field(form.is_featured) }}{% endif %}
+          <div class="d-grid gap-2 mt-3">
+            <button class="btn btn-primary" type="submit">{{ 'Save changes' if item else 'Create item' }}</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('knowledge_vault.detail', slug=item.slug) if item else url_for('knowledge_vault.index') }}">Cancel</a>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

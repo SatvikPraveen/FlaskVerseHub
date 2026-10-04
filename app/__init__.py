@@ -98,10 +98,12 @@ def _init_extensions(app: Flask) -> None:
 
 def _register_blueprints(app: Flask) -> None:
     from app.auth import bp as auth_bp
+    from app.knowledge_vault import bp as vault_bp
     from app.main import bp as main_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(vault_bp, url_prefix="/knowledge")
 
 
 def _register_infrastructure(app: Flask) -> None:
@@ -131,6 +133,10 @@ def _register_template_helpers(app: Flask) -> None:
     @app.template_filter("excerpt")
     def _excerpt(value: Any, length: int = 200) -> str:
         return excerpt(value, length=length)
+
+    @app.template_filter("reject_key")
+    def _reject_key(mapping: dict[str, Any], key: str) -> dict[str, Any]:
+        return {k: v for k, v in mapping.items() if k != key}
 
     import platform
     from importlib import metadata

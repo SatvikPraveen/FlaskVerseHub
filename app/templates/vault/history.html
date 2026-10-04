@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}History · {{ item.title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 900px">
+  <nav aria-label="breadcrumb"><ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.index') }}">Knowledge Vault</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.detail', slug=item.slug) }}">{{ item.title }}</a></li>
+    <li class="breadcrumb-item active">History</li>
+  </ol></nav>
+  <h1 class="h3 mb-3">Revision history</h1>
+  <ul class="list-group">
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div><span class="badge text-bg-primary me-2">v{{ item.version }}</span><strong>{{ item.title }}</strong> <span class="text-muted small">(current)</span></div>
+      <span class="small text-muted">{{ item.updated_at|timeago }}{% if item.updated_by %} by {{ item.updated_by.username }}{% endif %}</span>
+    </li>
+    {% for rev in revisions %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div>
+        <span class="badge text-bg-secondary me-2">v{{ rev.version }}</span>
+        <a href="{{ url_for('knowledge_vault.revision', slug=item.slug, version=rev.version) }}">{{ rev.title }}</a>
+        {% if rev.note %}<span class="text-muted small">— {{ rev.note }}</span>{% endif %}
+      </div>
+      <span class="small text-muted">{{ rev.created_at|timeago }}{% if rev.editor %} by {{ rev.editor.username }}{% endif %}</span>
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted">No earlier revisions.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

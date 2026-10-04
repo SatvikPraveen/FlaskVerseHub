@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "macros/items.html" import item_card %}
+{% from "macros/pagination.html" import render_pagination %}
+{% block title %}Knowledge Vault · {{ app_name }}{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('knowledge_vault.static', filename='css/vault.css') }}" />{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-0"><i class="fa-solid fa-book me-2 text-primary"></i>Knowledge Vault</h1>
+      <p class="text-muted small mb-0">{{ page.total }} item{{ 's' if page.total != 1 }}{% if filters.query %} matching “{{ filters.query }}”{% endif %}</p>
+    </div>
+    {% if current_user.is_authenticated %}
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('knowledge_vault.bookmarks') }}"><i class="fa-regular fa-bookmark me-1"></i>Bookmarks</a>
+      <a class="btn btn-primary" href="{{ url_for('knowledge_vault.create') }}"><i class="fa-solid fa-plus me-1"></i>New item</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <form class="card card-body mb-4" method="get" action="{{ url_for('knowledge_vault.index') }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small text-muted" for="q">Search</label>
+        <input class="form-control" id="q" type="search" name="q" value="{{ filters.query or '' }}" placeholder="Title, summary or content" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted" for="category">Category</label>
+        <select class="form-select" id="category" name="category">
+          <option value="">All</option>
+          {% for c in categories %}<option value="{{ c.slug }}" {% if filters.category == c.slug %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted" for="difficulty">Difficulty</label>
+        <select class="form-select" id="difficulty" name="difficulty">
+          <option value="">Any</option>
+          {% for d in ['beginner','intermediate','advanced','expert'] %}<option value="{{ d }}" {% if filters.difficulty == d %}selected{% endif %}>{{ d|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted" for="sort">Sort</label>
+        <select class="form-select" id="sort" name="sort">
+          {% for s in sort_options %}<option value="{{ s }}" {% if filters.sort == s %}selected{% endif %}>{{ s|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button class="btn btn-primary flex-grow-1" type="submit">Filter</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('knowledge_vault.index') }}" title="Reset"><i class="fa-solid fa-rotate-left"></i></a>
+      </div>
+    </div>
+    {% if current_user.is_authenticated %}
+    <div class="mt-2 d-flex gap-3 small">
+      <div class="form-check"><input class="form-check-input" type="checkbox" id="mine" name="mine" value="1" {% if filters.mine %}checked{% endif %} onchange="this.form.submit()" /><label class="form-check-label" for="mine">Only my items</label></div>
+      <div class="form-check"><input class="form-check-input" type="checkbox" id="featured" name="featured" value="1" {% if filters.featured %}checked{% endif %} onchange="this.form.submit()" /><label class="form-check-label" for="featured">Featured only</label></div>
+    </div>
+    {% endif %}
+    {% if filters.tag %}<input type="hidden" name="tag" value="{{ filters.tag }}" /><div class="mt-2 small">Tag: <span class="badge text-bg-primary">#{{ filters.tag }}</span> <a href="{{ url_for('knowledge_vault.index', **(filters.as_query_args()|reject_key('tag'))) }}">clear</a></div>{% endif %}
+  </form>
+
+  <div class="row g-4">
+    <div class="col-lg-9">
+      {% if page.items %}
+      {% if bulk_form %}
+      <form method="post" action="{{ url_for('knowledge_vault.bulk') }}" id="bulk-form">
+        {{ bulk_form.hidden_tag() }}
+        <div class="d-flex align-items-center gap-2 mb-2 small">
+          <input class="form-check-input" type="checkbox" id="select-all" aria-label="Select all" onchange="document.querySelectorAll('.bulk-check').forEach(c => c.checked = this.checked)" />
+          <label for="select-all" class="text-muted">Select</label>
+          {{ bulk_form.action(class_='form-select form-select-sm w-auto') }}
+          <button class="btn btn-sm btn-outline-primary" type="submit">Apply to selected</button>
+        </div>
+        <div class="row g-3">
+          {% for item in page.items %}
+          <div class="col-md-6 col-xl-4 position-relative">
+            <input class="form-check-input bulk-check position-absolute" style="top:.75rem;left:1.5rem;z-index:2" type="checkbox" name="item_ids" value="{{ item.id }}" aria-label="Select {{ item.title }}" />
+            {{ item_card(item) }}
+          </div>
+          {% endfor %}
+        </div>
+      </form>
+      {% else %}
+      <div class="row g-3">
+        {% for item in page.items %}<div class="col-md-6 col-xl-4">{{ item_card(item) }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      {{ render_pagination(page, 'knowledge_vault.index', filters.as_query_args()) }}
+      {% else %}
+      <div class="card"><div class="card-body text-center text-muted py-5">
+        <i class="fa-regular fa-folder-open fa-2x mb-3 d-block"></i>
+        Nothing matches these filters.
+        {% if current_user.is_authenticated %}<a href="{{ url_for('knowledge_vault.create') }}">Write the first item.</a>{% endif %}
+      </div></div>
+      {% endif %}
+    </div>
+    <aside class="col-lg-3">
+      <div class="card mb-3">
+        <div class="card-header fw-semibold small">Popular tags</div>
+        <div class="card-body d-flex flex-wrap gap-1">
+          {% for tag, n in popular_tags %}
+          <a class="badge text-bg-light border text-decoration-none" href="{{ url_for('knowledge_vault.index', tag=tag.slug) }}">#{{ tag.name }} <span class="text-muted">{{ n }}</span></a>
+          {% else %}<span class="text-muted small">No tags yet.</span>{% endfor %}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header fw-semibold small">Categories</div>
+        <div class="list-group list-group-flush">
+          {% for c in categories %}
+          <a class="list-group-item list-group-item-action py-2 small {% if filters.category == c.slug %}active{% endif %}" href="{{ url_for('knowledge_vault.index', category=c.slug) }}">
+            <span class="d-inline-block rounded-circle me-2" style="width:.55rem;height:.55rem;background:{{ c.color }}"></span>{{ c.name }}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

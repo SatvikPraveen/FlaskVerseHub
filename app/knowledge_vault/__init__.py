@@ -1,14 +1,14 @@
-# File: app/knowledge_vault/__init__.py
-# 📚 Knowledge Vault Blueprint Registration
+"""Knowledge Vault: authoring, browsing and curating knowledge items."""
 
 from flask import Blueprint
 
-knowledge_vault = Blueprint(
+bp = Blueprint(
     "knowledge_vault",
     __name__,
-    template_folder="templates",
     static_folder="static",
-    static_url_path="/knowledge_vault/static",
+    static_url_path="/static/vault",
 )
 
-from . import routes
+from app.knowledge_vault import routes  # noqa: E402, F401
+
+__all__ = ["bp"]

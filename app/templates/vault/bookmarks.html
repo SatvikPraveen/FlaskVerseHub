@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "macros/items.html" import item_card %}
+{% from "macros/pagination.html" import render_pagination %}
+{% block title %}Bookmarks · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3 mb-3"><i class="fa-solid fa-bookmark me-2 text-warning"></i>Your bookmarks</h1>
+  {% if page.items %}
+  <div class="row g-3">{% for item in page.items %}<div class="col-md-6 col-lg-4">{{ item_card(item) }}</div>{% endfor %}</div>
+  {{ render_pagination(page, 'knowledge_vault.bookmarks') }}
+  {% else %}
+  <p class="text-muted">Nothing bookmarked yet. Use the bookmark button on any item.</p>
+  {% endif %}
+</div>
+{% endblock %}

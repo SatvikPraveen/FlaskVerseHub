@@ -41,7 +41,9 @@ def _is_safe_url(target: str | None) -> bool:
 
 def _redirect_back(default: str = "main.index") -> Response:
     target = request.args.get("next")
-    return redirect(target if _is_safe_url(target) else url_for(default))
+    if target and _is_safe_url(target):
+        return redirect(target)
+    return redirect(url_for(default))
 
 
 def _auth_limit() -> str:

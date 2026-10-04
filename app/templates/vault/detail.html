@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% from "macros/items.html" import item_card %}
+{% from "macros/forms.html" import render_field %}
+{% block title %}{{ item.title }} · {{ app_name }}{% endblock %}
+{% block meta_description %}{{ item.summary or item.content|excerpt(150) }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <nav aria-label="breadcrumb"><ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.index') }}">Knowledge Vault</a></li>
+    {% if item.category %}<li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.index', category=item.category.slug) }}">{{ item.category.name }}</a></li>{% endif %}
+    <li class="breadcrumb-item active">{{ item.title }}</li>
+  </ol></nav>
+  <div class="row g-4">
+    <article class="col-lg-8">
+      <header class="mb-4">
+        <div class="d-flex flex-wrap gap-2 mb-2 small">
+          {% if item.category %}<span class="badge rounded-pill" style="background:{{ item.category.color }}">{{ item.category.name }}</span>{% endif %}
+          <span class="badge text-bg-light border">{{ item.difficulty.value|title }}</span>
+          {% if item.status.value != 'published' %}<span class="badge text-bg-warning">{{ item.status.value|title }}</span>{% endif %}
+          {% if not item.is_public %}<span class="badge text-bg-secondary"><i class="fa-solid fa-lock me-1"></i>Private</span>{% endif %}
+          {% if item.is_featured %}<span class="badge text-bg-warning"><i class="fa-solid fa-star me-1"></i>Featured</span>{% endif %}
+        </div>
+        <h1 class="h2">{{ item.title }}</h1>
+        {% if item.summary %}<p class="lead text-muted">{{ item.summary }}</p>{% endif %}
+        <div class="d-flex flex-wrap gap-3 small text-muted">
+          <span><i class="fa-regular fa-user me-1"></i>{{ item.author.full_name }}</span>
+          <span><i class="fa-regular fa-clock me-1"></i>{{ item.reading_time }} min read · {{ item.word_count }} words</span>
+          <span><i class="fa-regular fa-eye me-1"></i>{{ item.view_count }} views</span>
+          <span><i class="fa-solid fa-code-branch me-1"></i><a href="{{ url_for('knowledge_vault.history', slug=item.slug) }}">v{{ item.version }}</a></span>
+          <span title="{{ item.updated_at|datetime }}">Updated {{ item.updated_at|timeago }}</span>
+        </div>
+      </header>
+      <div class="item-content mb-4">{{ item.content|safe }}</div>
+      {% if item.source_url %}<p class="small"><i class="fa-solid fa-link me-1"></i>Source: <a href="{{ item.source_url }}" rel="noopener nofollow">{{ item.source_url }}</a></p>{% endif %}
+      <div class="d-flex flex-wrap gap-1 mb-4">
+        {% for tag in item.tags %}<a class="badge text-bg-light border text-decoration-none" href="{{ url_for('knowledge_vault.index', tag=tag.slug) }}">#{{ tag.name }}</a>{% endfor %}
+      </div>
+
+      <section id="comments" class="mt-5">
+        <h2 class="h5 mb-3"><i class="fa-regular fa-comments me-2"></i>Comments ({{ item.comments.count() }})</h2>
+        {% macro render_comment(comment, depth=0) %}
+        <div class="d-flex gap-2 mb-3 {% if depth %}ms-4{% endif %}" id="comment-{{ comment.id }}">
+          <div class="user-avatar-sm flex-shrink-0">{{ comment.author.username[0]|upper }}</div>
+          <div class="flex-grow-1">
+            <div class="small"><strong>{{ comment.author.username }}</strong> <span class="text-muted">· {{ comment.created_at|timeago }}</span></div>
+            <div class="{% if comment.is_deleted %}text-muted fst-italic{% endif %}">{{ '[removed]' if comment.is_deleted else comment.body }}</div>
+            {% if current_user.is_authenticated and not comment.is_deleted %}
+            <div class="small mt-1 d-flex gap-2">
+              <button class="btn btn-link btn-sm p-0" type="button" onclick="const f=document.getElementById('comment-form');f.parent_id.value='{{ comment.id }}';f.body.focus();">Reply</button>
+              {% if current_user.is_admin or comment.author_id == current_user.id or item.author_id == current_user.id %}
+              <form method="post" action="{{ url_for('knowledge_vault.delete_comment', comment_id=comment.id) }}" data-confirm="Remove this comment?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button class="btn btn-link btn-sm p-0 text-danger" type="submit">Remove</button>
+              </form>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% for reply in comment.replies %}{{ render_comment(reply, depth + 1) }}{% endfor %}
+          </div>
+        </div>
+        {% endmacro %}
+        {% for comment in comments %}{{ render_comment(comment) }}{% else %}<p class="text-muted small">No comments yet.</p>{% endfor %}
+        {% if current_user.is_authenticated %}
+        <form id="comment-form" method="post" action="{{ url_for('knowledge_vault.add_comment', slug=item.slug) }}" class="mt-3" novalidate>
+          {{ comment_form.hidden_tag() }}
+          {{ comment_form.parent_id() }}
+          {{ render_field(comment_form.body, label_visible=false, placeholder="Add a comment…") }}
+          <button class="btn btn-primary btn-sm" type="submit">Post comment</button>
+        </form>
+        {% else %}
+        <p class="small text-muted"><a href="{{ url_for('auth.login', next=request.path) }}">Sign in</a> to join the discussion.</p>
+        {% endif %}
+      </section>
+    </article>
+
+    <aside class="col-lg-4">
+      <div class="sidebar-sticky">
+        <div class="card mb-3"><div class="card-body d-grid gap-2">
+          {% if current_user.is_authenticated %}
+          <form method="post" action="{{ url_for('knowledge_vault.bookmark', slug=item.slug) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="btn {{ 'btn-warning' if bookmarked else 'btn-outline-warning' }} w-100" type="submit">
+              <i class="fa-{{ 'solid' if bookmarked else 'regular' }} fa-bookmark me-1"></i>{{ 'Bookmarked' if bookmarked else 'Bookmark' }} ({{ bookmark_count }})
+            </button>
+          </form>
+          {% endif %}
+          {% if can_edit %}
+          <a class="btn btn-outline-primary" href="{{ url_for('knowledge_vault.edit', slug=item.slug) }}"><i class="fa-solid fa-pen me-1"></i>Edit</a>
+          <form method="post" action="{{ url_for('knowledge_vault.delete', slug=item.slug) }}" data-confirm="Delete “{{ item.title }}” permanently?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="btn btn-outline-danger w-100" type="submit"><i class="fa-solid fa-trash me-1"></i>Delete</button>
+          </form>
+          {% endif %}
+          <div class="btn-group">
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('knowledge_vault.export', slug=item.slug, fmt='json') }}"><i class="fa-solid fa-download me-1"></i>JSON</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('knowledge_vault.export', slug=item.slug, fmt='md') }}"><i class="fa-brands fa-markdown me-1"></i>Markdown</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('knowledge_vault.history', slug=item.slug) }}"><i class="fa-solid fa-clock-rotate-left me-1"></i>History</a>
+          </div>
+        </div></div>
+        {% if related %}
+        <h2 class="h6 text-muted">Related</h2>
+        <div class="d-grid gap-2">{% for r in related %}{{ item_card(r, show_author=false) }}{% endfor %}</div>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
