@@ -1,0 +1,32 @@
+# Default retrieval benchmark configuration.
+# Reproduce with: python -m experiments.run_retrieval_benchmark --config experiments/configs/default.yaml
+seed: 42
+corpus:
+  num_docs: 600
+  num_topics: 12
+  subtopics_per_topic: 4
+  queries_per_subtopic: 2
+  vocab_per_topic: 60
+  subtopic_vocab: 10
+  shared_vocab: 200
+  secondary_topic_prob: 0.35
+  noise_ratio: 0.45
+  subtopic_ratio: 0.12
+  inflection_rate: 0.35
+  stuffing_prob: 0.05
+analyzers:
+  porter+stop: { stem: true }
+  nostem: { stem: false }
+rankers:
+  "bm25(k1=1.2,b=0.75)": { name: bm25, params: { k1: 1.2, b: 0.75 } }
+  "bm25(k1=1.5,b=0.75)": { name: bm25, params: { k1: 1.5, b: 0.75 } }
+  "bm25(k1=2.0,b=0.75)": { name: bm25, params: { k1: 2.0, b: 0.75 } }
+  "bm25(k1=1.5,b=0.0)": { name: bm25, params: { k1: 1.5, b: 0.0 } }
+  "bm25(k1=1.5,b=1.0)": { name: bm25, params: { k1: 1.5, b: 1.0 } }
+  "bm25+(delta=1)": { name: bm25plus, params: { k1: 1.5, b: 0.75, delta: 1.0 } }
+  "tfidf(lnc.ltc)": { name: tfidf, params: {} }
+field_boosts: { title: 3.0, content: 1.0 }
+baseline: "bm25(k1=1.5,b=0.75)"
+primary_metric: nDCG@10
+binary_threshold: 3.0
+k: 10

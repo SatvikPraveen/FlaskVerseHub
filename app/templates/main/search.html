@@ -14,9 +14,9 @@
   {% if query %}
     {% if results and results.total %}
       <p class="text-muted">{{ results.total }} result{{ 's' if results.total != 1 }} for <strong>{{ query }}</strong>
-        {% if results.ranker %}<span class="badge text-bg-light border ms-2">ranked by {{ results.ranker|upper }} in {{ results.elapsed_ms }} ms</span>{% endif %}</p>
+        {% if results.ranker %}<span class="badge text-bg-light border ms-2">ranked by {{ results.ranker|upper }} in {{ results.elapsed_ms }} ms</span>{% if results.terms %} <span class="small">terms: {% for t in results.terms %}<code>{{ t }}</code>{{ ' ' if not loop.last }}{% endfor %}</span>{% endif %}{% endif %}</p>
       <div class="row g-3">
-        {% for item in results.items %}<div class="col-md-6 col-lg-4">{{ item_card(item) }}</div>{% endfor %}
+        {% for item in results.items %}<div class="col-md-6 col-lg-4 position-relative">{{ item_card(item) }}{% if results.scores %}<span class="badge text-bg-dark position-absolute" style="top:-.4rem;right:1.2rem" title="Relevance score">{{ '%.2f'|format(results.scores[item.id]) }}</span>{% endif %}</div>{% endfor %}
       </div>
       {{ render_pagination(results, 'main.search', {'q': query}) }}
     {% else %}

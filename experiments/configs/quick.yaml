@@ -1,0 +1,12 @@
+# Small configuration used by the test-suite and for quick sanity checks.
+seed: 7
+corpus: { num_docs: 150, num_topics: 6, subtopics_per_topic: 3, queries_per_subtopic: 1 }
+analyzers:
+  porter+stop: { stem: true }
+rankers:
+  "bm25(k1=1.5,b=0.75)": { name: bm25, params: { k1: 1.5, b: 0.75 } }
+  "tfidf(lnc.ltc)": { name: tfidf, params: {} }
+baseline: "bm25(k1=1.5,b=0.75)"
+primary_metric: nDCG@10
+binary_threshold: 3.0
+k: 10

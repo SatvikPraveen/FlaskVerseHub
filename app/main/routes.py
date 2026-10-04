@@ -50,14 +50,14 @@ def search() -> str:
     page, per_page = page_args()
     results: Any = None
     if query:
-        visible = KnowledgeItem.visible_to(current_user if current_user.is_authenticated else None)
-        pattern = f"%{query}%"
-        stmt = visible.where(
-            KnowledgeItem.title.ilike(pattern)
-            | KnowledgeItem.summary.ilike(pattern)
-            | KnowledgeItem.content.ilike(pattern)
-        ).order_by(KnowledgeItem.updated_at.desc())
-        results = paginate(stmt, page, per_page)
+        from app.search.service import search_items
+
+        results = search_items(
+            query,
+            user=current_user if current_user.is_authenticated else None,
+            page=page,
+            per_page=per_page,
+        )
     return render_template("main/search.html", query=query, results=results)
 
 

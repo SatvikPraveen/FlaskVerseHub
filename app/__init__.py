@@ -110,9 +110,11 @@ def _register_infrastructure(app: Flask) -> None:
     from app import observability
     from app.cli import register_cli
     from app.errors import register_error_handlers
+    from app.search import service as search_service
     from app.security import register_security_headers
 
     observability.init_app(app)
+    search_service.init_app(app)
     register_error_handlers(app)
     register_security_headers(app)
     register_cli(app)
