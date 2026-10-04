@@ -58,7 +58,7 @@ jobs:
         run: pytest --cov --cov-report=xml --cov-report=term --junitxml=junit.xml -m "not slow"
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.xml
           fail_ci_if_error: false
