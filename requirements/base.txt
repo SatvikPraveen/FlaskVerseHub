@@ -33,7 +33,7 @@ redis>=5.0,<7.0
 
 # API layer
 marshmallow>=3.20,<4.0
-graphene>=3.3,<4.0
+graphene>=3.4.3,<4.0
 
 # Observability
 structlog>=24.1,<27.0
