@@ -130,7 +130,6 @@ dmypy.json
 *.sqlite
 *.sqlite3
 flaskversehub.db
-migrations/versions/*
 
 # Logs
 logs/

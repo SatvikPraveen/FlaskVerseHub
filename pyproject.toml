@@ -61,7 +61,7 @@ dependencies = { file = ["requirements/base.txt"] }
 line-length = 100
 target-version = "py311"
 src = ["app", "tests", "experiments"]
-extend-exclude = ["migrations", ".venv"]
+extend-exclude = ["migrations", ".venv", "*.md"]
 
 [tool.ruff.lint]
 select = [
