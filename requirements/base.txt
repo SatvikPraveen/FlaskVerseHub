@@ -29,7 +29,7 @@ Flask-Caching>=2.1,<3.0
 Flask-Mail>=0.10,<1.0
 Flask-SocketIO>=5.3,<6.0
 Flask-Cors>=4.0,<7.0
-redis>=5.0,<7.0
+redis>=8.1.0,<9.0
 
 # API layer
 marshmallow>=3.20,<4.0
