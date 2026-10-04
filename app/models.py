@@ -1,431 +1,908 @@
-# File: FlaskVerseHub/app/models.py
+"""Domain model for FlaskVerseHub.
 
-from datetime import datetime, timezone
-from flask import current_app
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
+Design notes
+------------
+* SQLAlchemy 2.0 declarative style with ``Mapped`` annotations so the model is
+  fully typed and checkable with mypy.
+* Every timestamp is stored as UTC and read back timezone-aware through
+  :class:`UTCDateTime`, regardless of the backend (SQLite drops tzinfo).
+* :class:`KnowledgeItem` is the central aggregate: it owns tags, revisions,
+  comments, attachments and bookmarks. Revisions give an append-only history
+  so edits are reproducible and auditable.
+* Visibility is a *policy*, expressed once in :meth:`KnowledgeItem.visible_to`,
+  and reused by the vault, REST and GraphQL layers.
+"""
+
+from __future__ import annotations
+
+import enum
+import hashlib
 import secrets
+from datetime import datetime
+from typing import Any
+
+from flask_login import UserMixin
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    event,
+    select,
+)
+from sqlalchemy.engine import Dialect
+from sqlalchemy.orm import Mapped, Mapper, Session, mapped_column, relationship, validates
+from sqlalchemy.sql import Select
+from sqlalchemy.types import TypeDecorator
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from app.extensions import db
-
-
-# Association Tables for Many-to-Many relationships
-knowledge_categories = db.Table(
-    'knowledge_categories',
-    db.Column('knowledge_id', db.Integer, db.ForeignKey('knowledge_item.id'), primary_key=True),
-    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True),
-    db.Column('created_at', db.DateTime, default=lambda: datetime.now(timezone.utc))
+from app.utils.text import (
+    parse_tag_list,
+    reading_time_minutes,
+    slugify,
+    unique_slug,
+    word_count,
 )
+from app.utils.time import ensure_aware, from_now, is_expired, utcnow
 
-user_roles = db.Table(
-    'user_roles',
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
-    db.Column('role_id', db.Integer, db.ForeignKey('role.id'), primary_key=True),
-    db.Column('assigned_at', db.DateTime, default=lambda: datetime.now(timezone.utc))
-)
+# --------------------------------------------------------------------------- #
+# Column types and mixins
+# --------------------------------------------------------------------------- #
+
+
+class UTCDateTime(TypeDecorator[datetime]):
+    """Store aware datetimes as naive UTC and return them aware.
+
+    SQLite has no timezone support and PostgreSQL ``timestamp`` columns
+    normalise to the session timezone; this decorator makes behaviour
+    identical across both so comparisons never raise ``TypeError``.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, _dialect: Dialect) -> datetime | None:
+        aware = ensure_aware(value)
+        return aware.replace(tzinfo=None) if aware is not None else None
+
+    def process_result_value(self, value: datetime | None, _dialect: Dialect) -> datetime | None:
+        return ensure_aware(value)
 
 
 class TimestampMixin:
-    """Mixin to add timestamp fields to models."""
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), 
-                          onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    """``created_at`` / ``updated_at`` maintained by the database layer."""
+
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
 
 
-class User(UserMixin, db.Model, TimestampMixin):
-    """User model for authentication and user management."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    first_name = db.Column(db.String(50), nullable=False)
-    last_name = db.Column(db.String(50), nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    
-    # Profile fields
-    bio = db.Column(db.Text)
-    avatar_url = db.Column(db.String(255))
-    phone = db.Column(db.String(20))
-    location = db.Column(db.String(100))
-    website = db.Column(db.String(255))
-    
-    # Account status
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    is_admin = db.Column(db.Boolean, default=False, nullable=False)
-    email_verified = db.Column(db.Boolean, default=False, nullable=False)
-    
-    # Authentication tracking
-    last_login = db.Column(db.DateTime)
-    login_count = db.Column(db.Integer, default=0)
-    failed_login_attempts = db.Column(db.Integer, default=0)
-    locked_until = db.Column(db.DateTime)
-    
-    # Password reset
-    reset_token = db.Column(db.String(255))
-    reset_token_expires = db.Column(db.DateTime)
-    
-    # Email verification
-    verification_token = db.Column(db.String(255))
-    verification_token_expires = db.Column(db.DateTime)
-    
-    # Preferences
-    timezone = db.Column(db.String(50), default='UTC')
-    language = db.Column(db.String(10), default='en')
-    theme = db.Column(db.String(20), default='light')
-    
-    # Relationships
-    knowledge_items = db.relationship('KnowledgeItem', backref='author', lazy='dynamic')
-    api_keys = db.relationship('ApiKey', backref='owner', lazy='dynamic')
-    activities = db.relationship('Activity', backref='user', lazy='dynamic')
-    roles = db.relationship('Role', secondary=user_roles, backref='users')
-    
-    def set_password(self, password):
-        """Set password hash."""
+# --------------------------------------------------------------------------- #
+# Association tables
+# --------------------------------------------------------------------------- #
+
+user_roles = Table(
+    "user_roles",
+    db.metadata,
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+)
+
+knowledge_item_tags = Table(
+    "knowledge_item_tags",
+    db.metadata,
+    Column(
+        "item_id", Integer, ForeignKey("knowledge_items.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+# --------------------------------------------------------------------------- #
+# Enumerations
+# --------------------------------------------------------------------------- #
+
+
+class ItemStatus(enum.StrEnum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class Difficulty(enum.StrEnum):
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+    EXPERT = "expert"
+
+
+class NotificationKind(enum.StrEnum):
+    INFO = "info"
+    SUCCESS = "success"
+    WARNING = "warning"
+    MENTION = "mention"
+    SYSTEM = "system"
+
+
+# --------------------------------------------------------------------------- #
+# Identity and access
+# --------------------------------------------------------------------------- #
+
+
+class Role(TimestampMixin, db.Model):
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(String(255))
+    permissions: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    users: Mapped[list[User]] = relationship(
+        "User", secondary=user_roles, back_populates="roles", lazy="selectin"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Role {self.name}>"
+
+
+class User(UserMixin, TimestampMixin, db.Model):
+    __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("length(username) >= 3", name="ck_users_username_min_length"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    first_name: Mapped[str | None] = mapped_column(String(64))
+    last_name: Mapped[str | None] = mapped_column(String(64))
+    bio: Mapped[str | None] = mapped_column(Text)
+    avatar_url: Mapped[str | None] = mapped_column(String(512))
+    website: Mapped[str | None] = mapped_column(String(255))
+    location: Mapped[str | None] = mapped_column(String(128))
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    last_login: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    login_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC", nullable=False)
+    language: Mapped[str] = mapped_column(String(8), default="en", nullable=False)
+    theme: Mapped[str] = mapped_column(String(16), default="light", nullable=False)
+    preferences: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+
+    roles: Mapped[list[Role]] = relationship(
+        "Role", secondary=user_roles, back_populates="users", lazy="selectin"
+    )
+    knowledge_items: Mapped[list[KnowledgeItem]] = relationship(
+        "KnowledgeItem",
+        back_populates="author",
+        foreign_keys="KnowledgeItem.author_id",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+    api_keys: Mapped[list[ApiKey]] = relationship(
+        "ApiKey", back_populates="owner", cascade="all, delete-orphan", lazy="dynamic"
+    )
+    activities: Mapped[list[Activity]] = relationship(
+        "Activity", back_populates="user", cascade="all, delete-orphan", lazy="dynamic"
+    )
+    comments: Mapped[list[Comment]] = relationship(
+        "Comment", back_populates="author", cascade="all, delete-orphan", lazy="dynamic"
+    )
+    bookmarks: Mapped[list[Bookmark]] = relationship(
+        "Bookmark", back_populates="user", cascade="all, delete-orphan", lazy="dynamic"
+    )
+    notifications: Mapped[list[Notification]] = relationship(
+        "Notification", back_populates="user", cascade="all, delete-orphan", lazy="dynamic"
+    )
+
+    MAX_FAILED_LOGINS = 5
+    LOCKOUT_MINUTES = 15
+
+    # -- credentials -------------------------------------------------------
+    def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
-    
-    def check_password(self, password):
-        """Check password against hash."""
+
+    def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
-    
-    def generate_reset_token(self):
-        """Generate password reset token."""
-        self.reset_token = secrets.token_urlsafe(32)
-        self.reset_token_expires = datetime.now(timezone.utc) + current_app.config.get(
-            'PASSWORD_RESET_EXPIRES', 3600
-        )
-        db.session.commit()
-        return self.reset_token
-    
-    def verify_reset_token(self, token):
-        """Verify password reset token."""
-        return (self.reset_token == token and 
-                self.reset_token_expires > datetime.now(timezone.utc))
-    
-    def generate_verification_token(self):
-        """Generate email verification token."""
-        self.verification_token = secrets.token_urlsafe(32)
-        self.verification_token_expires = datetime.now(timezone.utc) + current_app.config.get(
-            'EMAIL_VERIFICATION_EXPIRES', 86400
-        )
-        db.session.commit()
-        return self.verification_token
-    
+
+    def register_failed_login(self) -> None:
+        """Increment the failure counter and lock the account after repeated failures."""
+        self.failed_login_attempts += 1
+        if self.failed_login_attempts >= self.MAX_FAILED_LOGINS:
+            self.locked_until = from_now(minutes=self.LOCKOUT_MINUTES)
+
+    def register_successful_login(self) -> None:
+        self.failed_login_attempts = 0
+        self.locked_until = None
+        self.login_count += 1
+        self.last_login = utcnow()
+
+    # -- derived state -----------------------------------------------------
     @property
-    def full_name(self):
-        """Get user's full name."""
-        return f"{self.first_name} {self.last_name}"
-    
+    def is_locked(self) -> bool:
+        return self.locked_until is not None and not is_expired(self.locked_until)
+
     @property
-    def is_locked(self):
-        """Check if account is locked."""
-        return self.locked_until and self.locked_until > datetime.now(timezone.utc)
-    
-    def to_dict(self):
-        """Convert user to dictionary."""
-        return {
-            'id': self.id,
-            'username': self.username,
-            'email': self.email,
-            'full_name': self.full_name,
-            'is_active': self.is_active,
-            'is_admin': self.is_admin,
-            'created_at': self.created_at.isoformat(),
-            'last_login': self.last_login.isoformat() if self.last_login else None
+    def full_name(self) -> str:
+        parts = [p for p in (self.first_name, self.last_name) if p]
+        return " ".join(parts) if parts else self.username
+
+    @property
+    def role_names(self) -> set[str]:
+        names = {role.name for role in self.roles}
+        if self.is_admin:
+            names.add("admin")
+        return names
+
+    def has_role(self, *names: str) -> bool:
+        return self.is_admin or bool(self.role_names.intersection(names))
+
+    def has_permission(self, permission: str) -> bool:
+        if self.is_admin:
+            return True
+        return any(permission in role.permissions for role in self.roles)
+
+    def preference(self, key: str, default: Any = None) -> Any:
+        return (self.preferences or {}).get(key, default)
+
+    def to_dict(self, *, include_email: bool = False) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "id": self.id,
+            "username": self.username,
+            "full_name": self.full_name,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "bio": self.bio,
+            "avatar_url": self.avatar_url,
+            "is_admin": self.is_admin,
+            "roles": sorted(self.role_names),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_login": self.last_login.isoformat() if self.last_login else None,
         }
-    
-    def __repr__(self):
-        return f'<User {self.username}>'
+        if include_email:
+            data["email"] = self.email
+            data["email_verified"] = self.email_verified
+        return data
+
+    def __repr__(self) -> str:
+        return f"<User {self.username}>"
 
 
-class Role(db.Model, TimestampMixin):
-    """Role model for role-based access control."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(64), unique=True, nullable=False)
-    description = db.Column(db.String(255))
-    permissions = db.Column(db.JSON)
-    is_default = db.Column(db.Boolean, default=False)
-    
-    def __repr__(self):
-        return f'<Role {self.name}>'
+class ApiKey(TimestampMixin, db.Model):
+    """Hashed API credential. The clear-text key is shown exactly once at creation."""
 
+    __tablename__ = "api_keys"
 
-class Category(db.Model, TimestampMixin):
-    """Category model for organizing knowledge items."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
-    description = db.Column(db.Text)
-    color = db.Column(db.String(7), default='#007bff')  # Hex color code
-    icon = db.Column(db.String(50), default='fa-folder')
-    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
-    
-    # Hierarchy support
-    parent_id = db.Column(db.Integer, db.ForeignKey('category.id'))
-    parent = db.relationship('Category', remote_side=[id], backref='children')
-    
-    # Stats
-    item_count = db.Column(db.Integer, default=0)
-    
-    def __repr__(self):
-        return f'<Category {self.name}>'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    usage_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    owner: Mapped[User] = relationship("User", back_populates="api_keys")
 
-class KnowledgeItem(db.Model, TimestampMixin):
-    """Knowledge item model for CRUD operations."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False, index=True)
-    content = db.Column(db.Text, nullable=False)
-    summary = db.Column(db.String(500))
-    
-    # Metadata
-    slug = db.Column(db.String(255), nullable=False, unique=True, index=True)
-    status = db.Column(db.String(20), default='draft', nullable=False)  # draft, published, archived
-    priority = db.Column(db.String(20), default='normal')  # low, normal, high, critical
-    difficulty = db.Column(db.String(20), default='beginner')  # beginner, intermediate, advanced, expert
-    
-    # Content metadata
-    content_type = db.Column(db.String(50), default='markdown')
-    word_count = db.Column(db.Integer, default=0)
-    reading_time = db.Column(db.Integer, default=0)  # in minutes
-    
-    # SEO
-    meta_description = db.Column(db.String(160))
-    meta_keywords = db.Column(db.String(255))
-    
-    # Versioning
-    version = db.Column(db.Integer, default=1)
-    
-    # User relationships
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    updated_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    
-    # Stats
-    view_count = db.Column(db.Integer, default=0)
-    like_count = db.Column(db.Integer, default=0)
-    share_count = db.Column(db.Integer, default=0)
-    
-    # File attachments
-    has_attachments = db.Column(db.Boolean, default=False)
-    attachment_count = db.Column(db.Integer, default=0)
-    
-    # Publishing
-    published_at = db.Column(db.DateTime)
-    featured = db.Column(db.Boolean, default=False)
-    
-    # Relationships
-    categories = db.relationship('Category', secondary=knowledge_categories, backref='knowledge_items')
-    attachments = db.relationship('Attachment', backref='knowledge_item', lazy='dynamic')
-    
-    def __repr__(self):
-        return f'<KnowledgeItem {self.title}>'
-    
-    def to_dict(self):
-        """Convert knowledge item to dictionary."""
-        return {
-            'id': self.id,
-            'title': self.title,
-            'content': self.content,
-            'summary': self.summary,
-            'slug': self.slug,
-            'status': self.status,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
-            'author': self.author.username,
-            'view_count': self.view_count,
-            'categories': [cat.name for cat in self.categories]
-        }
-
-
-class Attachment(db.Model, TimestampMixin):
-    """File attachment model for knowledge items."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    original_filename = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(500), nullable=False)
-    file_size = db.Column(db.Integer, nullable=False)
-    content_type = db.Column(db.String(100), nullable=False)
-    checksum = db.Column(db.String(64))
-    
-    # Metadata
-    description = db.Column(db.Text)
-    is_public = db.Column(db.Boolean, default=True)
-    download_count = db.Column(db.Integer, default=0)
-    
-    # Relationships
-    knowledge_item_id = db.Column(db.Integer, db.ForeignKey('knowledge_item.id'), nullable=False)
-    uploaded_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    uploader = db.relationship('User', backref='attachments')
-    
-    def __repr__(self):
-        return f'<Attachment {self.original_filename}>'
-
-
-class ApiKey(db.Model, TimestampMixin):
-    """API key model for API authentication."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    key_hash = db.Column(db.String(255), nullable=False, unique=True)
-    prefix = db.Column(db.String(10), nullable=False)  # First few chars for identification
-    
-    # Permissions
-    scopes = db.Column(db.JSON, default=list)  # List of allowed scopes
-    rate_limit = db.Column(db.Integer, default=100)  # Requests per hour
-    
-    # Status
-    is_active = db.Column(db.Boolean, default=True)
-    expires_at = db.Column(db.DateTime)
-    
-    # Usage tracking
-    last_used = db.Column(db.DateTime)
-    usage_count = db.Column(db.Integer, default=0)
-    
-    # Relationships
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
     @staticmethod
-    def generate_key():
-        """Generate a new API key."""
-        return secrets.token_urlsafe(32)
-    
-    def set_key(self, key):
-        """Set API key hash."""
-        self.key_hash = generate_password_hash(key)
-        self.prefix = key[:8]
-    
-    def check_key(self, key):
-        """Check API key against hash."""
-        return check_password_hash(self.key_hash, key)
-    
+    def hash_key(raw: str) -> str:
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def issue(
+        cls, owner: User, name: str, *, scopes: list[str] | None = None
+    ) -> tuple[ApiKey, str]:
+        """Create a key for ``owner`` and return ``(record, clear_text_key)``."""
+        raw = f"fvh_{secrets.token_urlsafe(32)}"
+        record = cls(
+            name=name,
+            prefix=raw[:12],
+            key_hash=cls.hash_key(raw),
+            scopes=scopes or ["read"],
+            owner=owner,
+        )
+        return record, raw
+
+    @classmethod
+    def lookup(cls, raw: str) -> ApiKey | None:
+        record = db.session.scalar(select(cls).where(cls.key_hash == cls.hash_key(raw)))
+        if record is None or not record.is_usable:
+            return None
+        return record
+
     @property
-    def is_expired(self):
-        """Check if API key is expired."""
-        return self.expires_at and self.expires_at < datetime.now(timezone.utc)
-    
-    def __repr__(self):
-        return f'<ApiKey {self.name}>'
+    def is_expired(self) -> bool:
+        return is_expired(self.expires_at)
+
+    @property
+    def is_usable(self) -> bool:
+        return self.is_active and not self.is_expired
+
+    def touch(self) -> None:
+        self.usage_count += 1
+        self.last_used_at = utcnow()
+
+    def __repr__(self) -> str:
+        return f"<ApiKey {self.prefix}… ({self.name})>"
 
 
-class Activity(db.Model, TimestampMixin):
-    """Activity log model for tracking user actions."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    action = db.Column(db.String(50), nullable=False)  # create, read, update, delete, login, logout
-    resource_type = db.Column(db.String(50))  # knowledge_item, user, api_key, etc.
-    resource_id = db.Column(db.Integer)
-    description = db.Column(db.String(255))
-    
-    # Request metadata
-    ip_address = db.Column(db.String(45))
-    user_agent = db.Column(db.String(255))
-    endpoint = db.Column(db.String(100))
-    method = db.Column(db.String(10))
-    status_code = db.Column(db.Integer)
-    
-    # Additional data
-    metadata = db.Column(db.JSON)
-    
-    # Relationships
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    
-    def __repr__(self):
-        return f'<Activity {self.action} by {self.user.username if self.user else "Anonymous"}>'
-    
-    def to_dict(self):
-        """Convert activity to dictionary."""
+# --------------------------------------------------------------------------- #
+# Knowledge domain
+# --------------------------------------------------------------------------- #
+
+
+class Category(TimestampMixin, db.Model):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    color: Mapped[str] = mapped_column(String(7), default="#6c757d", nullable=False)
+    icon: Mapped[str] = mapped_column(String(50), default="folder", nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
+
+    parent: Mapped[Category | None] = relationship(
+        "Category", remote_side="Category.id", back_populates="children"
+    )
+    children: Mapped[list[Category]] = relationship("Category", back_populates="parent")
+    items: Mapped[list[KnowledgeItem]] = relationship(
+        "KnowledgeItem", back_populates="category", lazy="dynamic"
+    )
+
+    @property
+    def item_count(self) -> int:
+        return self.items.count()  # type: ignore[attr-defined]
+
+    def to_dict(self) -> dict[str, Any]:
         return {
-            'id': self.id,
-            'action': self.action,
-            'resource_type': self.resource_type,
-            'resource_id': self.resource_id,
-            'description': self.description,
-            'created_at': self.created_at.isoformat(),
-            'user': self.user.username if self.user else None,
-            'ip_address': self.ip_address
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "description": self.description,
+            "color": self.color,
+            "icon": self.icon,
+            "parent_id": self.parent_id,
+        }
+
+    def __repr__(self) -> str:
+        return f"<Category {self.slug}>"
+
+
+class Tag(db.Model):
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(60), unique=True, nullable=False, index=True)
+
+    items: Mapped[list[KnowledgeItem]] = relationship(
+        "KnowledgeItem", secondary=knowledge_item_tags, back_populates="tags", lazy="dynamic"
+    )
+
+    @classmethod
+    def get_or_create(cls, name: str) -> Tag:
+        normalized = " ".join(name.strip().lower().split())
+        with db.session.no_autoflush:
+            existing = db.session.scalar(select(cls).where(cls.name == normalized))
+        if existing is not None:
+            return existing
+        tag = cls(name=normalized, slug=slugify(normalized, max_length=60))
+        db.session.add(tag)
+        return tag
+
+    @property
+    def usage_count(self) -> int:
+        return self.items.count()  # type: ignore[attr-defined]
+
+    def __repr__(self) -> str:
+        return f"<Tag {self.name}>"
+
+
+class KnowledgeItem(TimestampMixin, db.Model):
+    __tablename__ = "knowledge_items"
+    __table_args__ = (
+        Index("ix_knowledge_items_visibility", "is_public", "status"),
+        Index("ix_knowledge_items_author_created", "author_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    slug: Mapped[str] = mapped_column(String(220), unique=True, nullable=False, index=True)
+    summary: Mapped[str | None] = mapped_column(String(500))
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str | None] = mapped_column(String(512))
+
+    status: Mapped[ItemStatus] = mapped_column(
+        Enum(ItemStatus, values_callable=lambda e: [m.value for m in e], native_enum=False),
+        default=ItemStatus.PUBLISHED,
+        nullable=False,
+    )
+    difficulty: Mapped[Difficulty] = mapped_column(
+        Enum(Difficulty, values_callable=lambda e: [m.value for m in e], native_enum=False),
+        default=Difficulty.INTERMEDIATE,
+        nullable=False,
+    )
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    view_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    like_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    author_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"), index=True
+    )
+
+    author: Mapped[User] = relationship(
+        "User", back_populates="knowledge_items", foreign_keys=[author_id]
+    )
+    updated_by: Mapped[User | None] = relationship("User", foreign_keys=[updated_by_id])
+    category: Mapped[Category | None] = relationship("Category", back_populates="items")
+    tags: Mapped[list[Tag]] = relationship(
+        "Tag", secondary=knowledge_item_tags, back_populates="items", lazy="selectin"
+    )
+    revisions: Mapped[list[KnowledgeItemRevision]] = relationship(
+        "KnowledgeItemRevision",
+        back_populates="item",
+        cascade="all, delete-orphan",
+        order_by="KnowledgeItemRevision.version.desc()",
+        lazy="dynamic",
+    )
+    comments: Mapped[list[Comment]] = relationship(
+        "Comment",
+        back_populates="item",
+        cascade="all, delete-orphan",
+        order_by="Comment.created_at",
+        lazy="dynamic",
+    )
+    attachments: Mapped[list[Attachment]] = relationship(
+        "Attachment", back_populates="item", cascade="all, delete-orphan", lazy="dynamic"
+    )
+    bookmarks: Mapped[list[Bookmark]] = relationship(
+        "Bookmark", back_populates="item", cascade="all, delete-orphan", lazy="dynamic"
+    )
+
+    # -- validation --------------------------------------------------------
+    @validates("title")
+    def _validate_title(self, _key: str, value: str) -> str:
+        cleaned = " ".join((value or "").split())
+        if not cleaned:
+            raise ValueError("title must not be empty")
+        return cleaned
+
+    # -- derived content statistics ----------------------------------------
+    @property
+    def word_count(self) -> int:
+        return word_count(self.content)
+
+    @property
+    def reading_time(self) -> int:
+        return reading_time_minutes(self.content)
+
+    @property
+    def tag_names(self) -> list[str]:
+        return [tag.name for tag in self.tags]
+
+    @property
+    def is_published(self) -> bool:
+        return self.status == ItemStatus.PUBLISHED
+
+    @property
+    def category_name(self) -> str | None:
+        return self.category.name if self.category else None
+
+    # -- behaviour ---------------------------------------------------------
+    def set_tags(self, value: str | list[str] | None) -> None:
+        """Replace the tag set from a comma-separated string or list."""
+        self.tags = [Tag.get_or_create(name) for name in parse_tag_list(value)]
+
+    def publish(self) -> None:
+        self.status = ItemStatus.PUBLISHED
+        self.published_at = self.published_at or utcnow()
+
+    def archive(self) -> None:
+        self.status = ItemStatus.ARCHIVED
+
+    def record_view(self) -> None:
+        self.view_count += 1
+
+    def snapshot(self, editor: User | None, *, note: str | None = None) -> KnowledgeItemRevision:
+        """Append the *current* state to the revision history before an edit."""
+        revision = KnowledgeItemRevision(
+            item=self,
+            version=self.version,
+            title=self.title,
+            summary=self.summary,
+            content=self.content,
+            editor=editor,
+            note=note,
+        )
+        db.session.add(revision)
+        return revision
+
+    def bump_version(self, editor: User | None = None, *, note: str | None = None) -> None:
+        """Snapshot and increment the version counter; call before mutating content."""
+        self.snapshot(editor, note=note)
+        self.version += 1
+        if editor is not None:
+            self.updated_by = editor
+
+    def is_visible_to(self, user: User | None) -> bool:
+        """Mirror of :meth:`visible_to` for a single instance."""
+        if self.is_public and self.is_published:
+            return True
+        if user is None or not getattr(user, "is_authenticated", False):
+            return False
+        return bool(user.is_admin or self.author_id == user.id)
+
+    @classmethod
+    def visible_to(cls, user: User | None) -> Select[tuple[KnowledgeItem]]:
+        """Base query for every item ``user`` may read.
+
+        Anonymous users see published public items; authenticated users also
+        see their own items; admins see everything.
+        """
+        stmt = select(cls)
+        if user is not None and getattr(user, "is_authenticated", False):
+            if user.is_admin:
+                return stmt
+            return stmt.where(
+                (cls.author_id == user.id)
+                | ((cls.is_public.is_(True)) & (cls.status == ItemStatus.PUBLISHED))
+            )
+        return stmt.where(cls.is_public.is_(True), cls.status == ItemStatus.PUBLISHED)
+
+    def to_dict(self, *, include_content: bool = True) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "id": self.id,
+            "title": self.title,
+            "slug": self.slug,
+            "summary": self.summary,
+            "source_url": self.source_url,
+            "status": self.status.value,
+            "difficulty": self.difficulty.value,
+            "is_public": self.is_public,
+            "is_featured": self.is_featured,
+            "version": self.version,
+            "view_count": self.view_count,
+            "like_count": self.like_count,
+            "word_count": self.word_count,
+            "reading_time": self.reading_time,
+            "tags": self.tag_names,
+            "category": self.category.to_dict() if self.category else None,
+            "author": {"id": self.author.id, "username": self.author.username},
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+        }
+        if include_content:
+            data["content"] = self.content
+        return data
+
+    def __repr__(self) -> str:
+        return f"<KnowledgeItem {self.slug}>"
+
+
+class KnowledgeItemRevision(db.Model):
+    """Immutable snapshot of a knowledge item at a given version."""
+
+    __tablename__ = "knowledge_item_revisions"
+    __table_args__ = (UniqueConstraint("item_id", "version", name="uq_revision_item_version"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    summary: Mapped[str | None] = mapped_column(String(500))
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    note: Mapped[str | None] = mapped_column(String(255))
+    editor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+    item: Mapped[KnowledgeItem] = relationship("KnowledgeItem", back_populates="revisions")
+    editor: Mapped[User | None] = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<Revision item={self.item_id} v{self.version}>"
+
+
+class Comment(TimestampMixin, db.Model):
+    __tablename__ = "comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    author_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"))
+
+    item: Mapped[KnowledgeItem] = relationship("KnowledgeItem", back_populates="comments")
+    author: Mapped[User] = relationship("User", back_populates="comments")
+    parent: Mapped[Comment | None] = relationship(
+        "Comment", remote_side="Comment.id", back_populates="replies"
+    )
+    replies: Mapped[list[Comment]] = relationship("Comment", back_populates="parent")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "body": "" if self.is_deleted else self.body,
+            "is_deleted": self.is_deleted,
+            "item_id": self.item_id,
+            "parent_id": self.parent_id,
+            "author": {"id": self.author.id, "username": self.author.username},
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def __repr__(self) -> str:
+        return f"<Comment {self.id} on item {self.item_id}>"
+
+
+class Bookmark(db.Model):
+    __tablename__ = "bookmarks"
+    __table_args__ = (UniqueConstraint("user_id", "item_id", name="uq_bookmark_user_item"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+    user: Mapped[User] = relationship("User", back_populates="bookmarks")
+    item: Mapped[KnowledgeItem] = relationship("KnowledgeItem", back_populates="bookmarks")
+
+
+class Attachment(TimestampMixin, db.Model):
+    __tablename__ = "attachments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    checksum_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    download_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    uploaded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    item: Mapped[KnowledgeItem] = relationship("KnowledgeItem", back_populates="attachments")
+    uploaded_by: Mapped[User | None] = relationship("User")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "filename": self.original_filename,
+            "content_type": self.content_type,
+            "size_bytes": self.size_bytes,
+            "checksum_sha256": self.checksum_sha256,
+            "download_count": self.download_count,
         }
 
 
-class Setting(db.Model, TimestampMixin):
-    """Application settings model."""
-    
-    id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(100), nullable=False, unique=True)
-    value = db.Column(db.Text)
-    value_type = db.Column(db.String(20), default='string')  # string, int, bool, json
-    description = db.Column(db.String(255))
-    category = db.Column(db.String(50), default='general')
-    is_public = db.Column(db.Boolean, default=False)  # Can be read by non-admin users
-    
+# --------------------------------------------------------------------------- #
+# Operational records
+# --------------------------------------------------------------------------- #
+
+
+class Activity(db.Model):
+    """Append-only audit trail of user and system actions."""
+
+    __tablename__ = "activities"
+    __table_args__ = (Index("ix_activities_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    resource_type: Mapped[str | None] = mapped_column(String(50))
+    resource_id: Mapped[int | None] = mapped_column(Integer)
+    description: Mapped[str | None] = mapped_column(String(500))
+    ip_address: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    endpoint: Mapped[str | None] = mapped_column(String(100))
+    extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    user: Mapped[User | None] = relationship("User", back_populates="activities")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "action": self.action,
+            "resource_type": self.resource_type,
+            "resource_id": self.resource_id,
+            "description": self.description,
+            "user": {"id": self.user.id, "username": self.user.username} if self.user else None,
+            "extra_data": self.extra_data,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def __repr__(self) -> str:
+        return f"<Activity {self.action} by {self.user_id}>"
+
+
+class Notification(db.Model):
+    __tablename__ = "notifications"
+    __table_args__ = (Index("ix_notifications_user_unread", "user_id", "is_read"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str | None] = mapped_column(Text)
+    kind: Mapped[NotificationKind] = mapped_column(
+        Enum(NotificationKind, values_callable=lambda e: [m.value for m in e], native_enum=False),
+        default=NotificationKind.INFO,
+        nullable=False,
+    )
+    link: Mapped[str | None] = mapped_column(String(512))
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user: Mapped[User] = relationship("User", back_populates="notifications")
+
+    def mark_read(self) -> None:
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = utcnow()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "body": self.body,
+            "kind": self.kind.value,
+            "link": self.link,
+            "is_read": self.is_read,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class Setting(TimestampMixin, db.Model):
+    """Typed key/value store for runtime-adjustable application settings."""
+
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str | None] = mapped_column(Text)
+    value_type: Mapped[str] = mapped_column(String(10), default="str", nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255))
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    _CASTS: dict[str, Any] = {
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": lambda v: str(v).lower() in {"1", "true", "yes", "on"},
+    }
+
+    def get_value(self) -> Any:
+        if self.value is None:
+            return None
+        return self._CASTS.get(self.value_type, str)(self.value)
+
+    def set_value(self, value: Any) -> None:
+        self.value_type = type(value).__name__ if type(value).__name__ in self._CASTS else "str"
+        self.value = str(value)
+
     @classmethod
-    def get_value(cls, key, default=None):
-        """Get setting value with type conversion."""
-        setting = cls.query.filter_by(key=key).first()
-        if not setting:
-            return default
-        
-        value = setting.value
-        if setting.value_type == 'int':
-            return int(value) if value else default
-        elif setting.value_type == 'bool':
-            return value.lower() in ('true', '1', 'yes') if value else default
-        elif setting.value_type == 'json':
-            import json
-            return json.loads(value) if value else default
-        else:
-            return value or default
-    
-    @classmethod
-    def set_value(cls, key, value, value_type='string'):
-        """Set setting value."""
-        setting = cls.query.filter_by(key=key).first()
-        if not setting:
-            setting = cls(key=key)
-            db.session.add(setting)
-        
-        if value_type == 'json':
-            import json
-            value = json.dumps(value)
-        else:
-            value = str(value)
-        
-        setting.value = value
-        setting.value_type = value_type
-        db.session.commit()
-        return setting
-    
-    def __repr__(self):
-        return f'<Setting {self.key}>'
+    def get(cls, key: str, default: Any = None) -> Any:
+        record = db.session.get(cls, key)
+        return record.get_value() if record is not None else default
 
 
-# Event listeners for automated tasks
-@db.event.listens_for(KnowledgeItem, 'before_insert')
-@db.event.listens_for(KnowledgeItem, 'before_update')
-def update_knowledge_item_stats(mapper, connection, target):
-    """Update knowledge item stats before save."""
-    if target.content:
-        # Calculate word count
-        import re
-        words = re.findall(r'\w+', target.content)
-        target.word_count = len(words)
-        
-        # Estimate reading time (average 200 words per minute)
-        target.reading_time = max(1, target.word_count // 200)
-    
-    # Generate slug if not provided
-    if not target.slug and target.title:
-        import re
-        slug = re.sub(r'[^\w\s-]', '', target.title.lower())
-        target.slug = re.sub(r'[-\s]+', '-', slug)
+# --------------------------------------------------------------------------- #
+# ORM event hooks
+# --------------------------------------------------------------------------- #
 
 
-@db.event.listens_for(User, 'after_insert')
-def assign_default_role(mapper, connection, target):
-    """Assign default role to new users."""
-    default_role = Role.query.filter_by(is_default=True).first()
-    if default_role:
-        target.roles.append(default_role)
+def _slug_exists(model: type[Any], slug: str, exclude_id: int | None) -> bool:
+    stmt = select(model.id).where(model.slug == slug)
+    if exclude_id is not None:
+        stmt = stmt.where(model.id != exclude_id)
+    return db.session.scalar(stmt) is not None
+
+
+@event.listens_for(KnowledgeItem, "before_insert")
+def _item_before_insert(_mapper: Mapper[Any], connection: Any, target: KnowledgeItem) -> None:  # noqa: ARG001
+    if not target.slug:
+        base = slugify(target.title)
+        target.slug = unique_slug(base, lambda s: _slug_exists(KnowledgeItem, s, None))
+    # Column defaults are not applied yet inside before_insert, so ``None`` means
+    # "will become the default", i.e. published.
+    if target.status in (None, ItemStatus.PUBLISHED) and target.published_at is None:
+        target.published_at = utcnow()
+
+
+@event.listens_for(KnowledgeItem, "before_update")
+def _item_before_update(_mapper: Mapper[Any], connection: Any, target: KnowledgeItem) -> None:  # noqa: ARG001
+    if target.status == ItemStatus.PUBLISHED and target.published_at is None:
+        target.published_at = utcnow()
+
+
+@event.listens_for(Category, "before_insert")
+def _category_before_insert(_mapper: Mapper[Any], connection: Any, target: Category) -> None:  # noqa: ARG001
+    if not target.slug:
+        base = slugify(target.name)
+        target.slug = unique_slug(base, lambda s: _slug_exists(Category, s, None))
+
+
+@event.listens_for(Session, "before_flush")
+def _assign_default_role(session: Session, _ctx: Any, _instances: Any) -> None:
+    """Attach the default role to newly created users, if one is configured."""
+    new_users = [obj for obj in session.new if isinstance(obj, User) and not obj.roles]
+    if not new_users:
+        return
+    default_role = session.scalar(select(Role).where(Role.is_default.is_(True)))
+    if default_role is None:
+        return
+    for user in new_users:
+        user.roles.append(default_role)
+
+
+__all__ = [
+    "Activity",
+    "ApiKey",
+    "Attachment",
+    "Bookmark",
+    "Category",
+    "Comment",
+    "Difficulty",
+    "ItemStatus",
+    "KnowledgeItem",
+    "KnowledgeItemRevision",
+    "Notification",
+    "NotificationKind",
+    "Role",
+    "Setting",
+    "Tag",
+    "UTCDateTime",
+    "User",
+    "knowledge_item_tags",
+    "user_roles",
+]
