@@ -182,3 +182,11 @@ instance/config.py
 *.bak
 *.backup
 *.old
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.benchmarks/
+
+# Experiment outputs (regenerate with `make experiment`; curated results are committed under experiments/results/)
+experiments/results/raw/

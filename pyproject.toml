@@ -1,0 +1,162 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flaskversehub"
+version = "2.0.0"
+description = "A research-grade Flask reference platform: knowledge management, REST/GraphQL APIs, real-time events, and a reproducible information-retrieval benchmark."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Satvik Praveen", email = "satvikpraveen707@gmail.com" }]
+keywords = ["flask", "sqlalchemy", "graphql", "websockets", "information-retrieval", "bm25", "benchmark"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Web Environment",
+  "Framework :: Flask",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Typing :: Typed",
+]
+dynamic = ["dependencies", "optional-dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/SatvikPraveen/FlaskVerseHub"
+Repository = "https://github.com/SatvikPraveen/FlaskVerseHub"
+Issues = "https://github.com/SatvikPraveen/FlaskVerseHub/issues"
+Changelog = "https://github.com/SatvikPraveen/FlaskVerseHub/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+packages = { find = { include = ["app*", "experiments*"], exclude = ["tests*"] } }
+include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements/base.txt"] }
+optional-dependencies.dev = { file = ["requirements/dev.txt"] }
+optional-dependencies.prod = { file = ["requirements/prod.txt"] }
+
+# --------------------------------------------------------------------------- #
+# Ruff: linting + formatting (replaces black, isort, flake8, pyupgrade)
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests", "experiments"]
+extend-exclude = ["migrations", ".venv"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",      # pycodestyle
+  "F",           # pyflakes
+  "I",           # isort
+  "B",           # bugbear
+  "UP",          # pyupgrade
+  "N",           # pep8-naming
+  "S",           # bandit (security)
+  "C4",          # comprehensions
+  "SIM",         # simplify
+  "RET",         # return
+  "ARG",         # unused arguments
+  "PTH",         # pathlib
+  "PL",          # pylint
+  "RUF",         # ruff-specific
+  "T20",         # no print
+  "DTZ",         # timezone-aware datetimes
+  "ERA",         # commented-out code
+]
+ignore = [
+  "PLR0913",  # too many arguments
+  "PLR2004",  # magic values in comparisons
+  "S101",     # assert (used in tests)
+  "RUF012",   # mutable class attributes (SQLAlchemy / Flask config style)
+  "E501",     # handled by formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "ARG", "PLR", "DTZ", "T20"]
+"experiments/**" = ["T20", "S311", "PLR"]
+"manage.py" = ["T20"]
+"app/cli/**" = ["T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "experiments"]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+# --------------------------------------------------------------------------- #
+# mypy
+# --------------------------------------------------------------------------- #
+[tool.mypy]
+python_version = "3.11"
+packages = ["app", "experiments"]
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+ignore_missing_imports = true
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["app.api_hub.graphql_*", "app.dashboard.sockets"]
+disallow_untyped_decorators = false
+
+# --------------------------------------------------------------------------- #
+# pytest + coverage
+# --------------------------------------------------------------------------- #
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--import-mode=importlib",
+]
+markers = [
+  "unit: fast, isolated tests",
+  "integration: tests that exercise several layers through the Flask test client",
+  "api: REST / GraphQL contract tests",
+  "research: tests of the retrieval engine and evaluation metrics",
+  "slow: long-running tests (deselect with -m 'not slow')",
+]
+filterwarnings = [
+  "error::DeprecationWarning:app",
+  "ignore::DeprecationWarning",
+  "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = ["app/*/templates/*", "app/static/*", "*/__main__.py"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = false
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  "\\.\\.\\.",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "migrations"]
+skips = ["B101"]
