@@ -37,7 +37,7 @@ graphene>=3.4.3,<4.0
 
 # Observability
 structlog>=24.1,<27.0
-prometheus-flask-exporter>=0.23,<1.0
+prometheus-flask-exporter>=0.23.2,<1.0
 
 # Retrieval engine (numerical core)
 numpy>=1.26,<3.0
