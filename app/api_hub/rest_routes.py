@@ -153,7 +153,7 @@ def token() -> Response:
         {
             "access_token": create_access_token(identity=result.user),
             "refresh_token": create_refresh_token(identity=result.user),
-            "token_type": "Bearer",
+            "token_type": "Bearer",  # nosec B105 - OAuth2 token type, not a secret
             "expires_in": int(current_app.config["JWT_ACCESS_TOKEN_EXPIRES"].total_seconds()),
             "user": UserPrivateSchema().dump(result.user),
         }
@@ -168,7 +168,7 @@ def refresh() -> Response:
     return jsonify(
         {
             "access_token": create_access_token(identity=user),
-            "token_type": "Bearer",
+            "token_type": "Bearer",  # nosec B105 - OAuth2 token type, not a secret
             "expires_in": int(current_app.config["JWT_ACCESS_TOKEN_EXPIRES"].total_seconds()),
         }
     )

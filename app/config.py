@@ -39,7 +39,7 @@ class Config:
     APP_VERSION = "2.0.0"
     BUILD_SHA = os.environ.get("BUILD_SHA", "dev")
 
-    SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
+    SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")  # nosec B105 - placeholder rejected in production
 
     # Persistence
     SQLALCHEMY_DATABASE_URI = os.environ.get(
@@ -157,7 +157,7 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     ENV_NAME = "testing"
     TESTING = True
-    SECRET_KEY = "testing-secret-key-with-at-least-32-bytes!"  # noqa: S105 - deterministic test secret
+    SECRET_KEY = "testing-secret-key-with-at-least-32-bytes!"  # noqa: S105  # nosec B105 - test-only
     JWT_SECRET_KEY = SECRET_KEY
     SQLALCHEMY_DATABASE_URI = "sqlite://"
     SQLALCHEMY_ENGINE_OPTIONS: dict[str, object] = {
@@ -189,7 +189,7 @@ class ProductionConfig(Config):
 
     @classmethod
     def init_app(cls, _app: object) -> None:
-        if cls.SECRET_KEY == "change-me-in-production":  # noqa: S105
+        if cls.SECRET_KEY == "change-me-in-production":  # noqa: S105  # nosec B105
             msg = "SECRET_KEY must be set in production"
             raise RuntimeError(msg)
         if not os.environ.get("DATABASE_URL"):

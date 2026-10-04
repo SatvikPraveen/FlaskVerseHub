@@ -123,7 +123,7 @@ def seed_reference_data() -> None:
 
 def seed_demo_data(*, seed: int = 42, items: int | None = None) -> dict[str, int]:
     """Users and knowledge items. Deterministic for a given ``seed``."""
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # nosec B311 - deterministic demo data, not security
     _ensure_roles()
     categories = _ensure_categories()
     admin = _ensure_user("admin", "admin@example.com", "AdminPass123!", admin=True)

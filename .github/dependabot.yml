@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      flask-stack:
+        patterns: ["Flask*", "flask-*", "Werkzeug", "Jinja2", "SQLAlchemy", "alembic"]
+      tooling:
+        patterns: ["ruff", "mypy", "bandit*", "pytest*", "hypothesis", "pre-commit"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly

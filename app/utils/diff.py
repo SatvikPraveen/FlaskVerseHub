@@ -29,7 +29,7 @@ def inline_diff(old: str, new: str) -> Markup:
             parts.append(f"<del>{escape(''.join(a[i1:i2]))}</del>")
         if op in {"insert", "replace"}:
             parts.append(f"<ins>{escape(''.join(b[j1:j2]))}</ins>")
-    return Markup("".join(parts))  # noqa: S704 - every fragment is escaped above
+    return Markup("".join(parts))  # noqa: S704  # nosec B704 - every fragment is escaped above
 
 
 def change_ratio(old: str, new: str) -> float:

@@ -1,0 +1,27 @@
+name: Bug report
+description: Something does not behave as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include the request, the response and the `X-Request-ID` header if available.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: v2.0.0 or a commit SHA
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: Python 3.12, SQLite/PostgreSQL, Docker or local
