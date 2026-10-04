@@ -43,4 +43,4 @@ prometheus-flask-exporter>=0.23,<1.0
 numpy>=1.26,<3.0
 
 # Configuration
-python-dotenv>=1.0,<2.0
+python-dotenv>=1.2.4,<2.0
