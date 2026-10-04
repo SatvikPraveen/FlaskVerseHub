@@ -23,6 +23,7 @@ from app.models import (
     User,
 )
 from app.security.sanitization import sanitize_html, sanitize_text
+from app.services import events
 from app.services.activity import record_activity
 from app.services.notifications import notify
 
@@ -159,6 +160,7 @@ def create_item(data: dict[str, Any], *, author: User) -> KnowledgeItem:
     db.session.flush()
     record_activity("item.created", user=author, resource=item, title=item.title)
     db.session.commit()
+    events.item_created(item)
     return item
 
 
@@ -171,6 +173,7 @@ def update_item(
     _apply_fields(item, data, actor=actor)
     record_activity("item.updated", user=actor, resource=item, version=item.version)
     db.session.commit()
+    events.item_updated(item, actor=actor.username)
     if item.author_id != actor.id and item.author.preference("email_notifications", True):
         notify(
             item.author,
@@ -185,9 +188,11 @@ def update_item(
 def delete_item(item: KnowledgeItem, *, actor: User) -> None:
     if not can_edit(item, actor):
         raise PermissionDeniedError
-    record_activity("item.deleted", user=actor, title=item.title, slug=item.slug)
+    slug, title = item.slug, item.title
+    record_activity("item.deleted", user=actor, title=title, slug=slug)
     db.session.delete(item)
     db.session.commit()
+    events.item_deleted(slug, title)
 
 
 def restore_revision(
@@ -248,6 +253,7 @@ def add_comment(
     db.session.flush()
     record_activity("comment.created", user=author, resource=comment, item_id=item.id)
     db.session.commit()
+    events.comment_added(comment)
     recipients = {item.author} | ({parent.author} if parent is not None else set())
     for recipient in recipients - {author}:
         notify(

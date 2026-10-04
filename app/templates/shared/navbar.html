@@ -32,6 +32,12 @@
       </form>
       <ul class="navbar-nav">
         {% if current_user.is_authenticated %}
+        <li class="nav-item">
+          <a class="nav-link position-relative" href="{{ url_for('dashboard.notifications') }}" aria-label="Notifications">
+            <i class="fa-regular fa-bell"></i>
+            <span id="nav-unread" class="badge rounded-pill text-bg-danger position-absolute top-0 start-100 translate-middle {% if not unread_notifications %}d-none{% endif %}" style="font-size:.6rem">{{ unread_notifications }}</span>
+          </a>
+        </li>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             <span class="user-avatar-sm">{{ current_user.username[0]|upper }}</span>

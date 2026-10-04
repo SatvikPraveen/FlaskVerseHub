@@ -99,6 +99,7 @@ def _init_extensions(app: Flask) -> None:
 def _register_blueprints(app: Flask) -> None:
     from app.api_hub import bp as api_bp
     from app.auth import bp as auth_bp
+    from app.dashboard import bp as dashboard_bp
     from app.knowledge_vault import bp as vault_bp
     from app.main import bp as main_bp
 
@@ -106,6 +107,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(vault_bp, url_prefix="/knowledge")
     app.register_blueprint(api_bp, url_prefix="/api/v1")
+    app.register_blueprint(dashboard_bp, url_prefix="/dashboard")
 
 
 def _register_infrastructure(app: Flask) -> None:
@@ -151,9 +153,17 @@ def _register_template_helpers(app: Flask) -> None:
 
     @app.context_processor
     def _inject_globals() -> dict[str, Any]:
+        from flask_login import current_user
+
         if not endpoints:
             endpoints.update(rule.endpoint for rule in app.url_map.iter_rules())
+        unread = 0
+        if current_user.is_authenticated:
+            from app.services.notifications import unread_count
+
+            unread = unread_count(current_user)
         return {
+            "unread_notifications": unread,
             "app_name": app.config.get("APP_NAME"),
             "app_version": app.config.get("APP_VERSION"),
             "flask_version": flask_version,

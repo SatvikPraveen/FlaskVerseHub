@@ -1,429 +1,107 @@
-# File: app/dashboard/routes.py
-# 📊 Dashboard Routes
+from __future__ import annotations
 
-from flask import render_template, request, jsonify, current_app
-from flask_login import login_required, current_user
-from sqlalchemy import func, desc, asc
-from datetime import datetime, timedelta
-import json
+from flask import abort, flash, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+from sqlalchemy import select
+from werkzeug.wrappers import Response
 
-from . import dashboard
-from ..models import KnowledgeEntry, User, db
-from ..auth.decorators import role_required
-from ..utils.cache_utils import cache
+from app.auth.decorators import admin_required
+from app.dashboard import analytics, bp
+from app.extensions import db
+from app.models import Bookmark, KnowledgeItem, Notification
+from app.utils.pagination import page_args, paginate
 
 
-@dashboard.route("/")
-@dashboard.route("/index")
+@bp.get("/")
 @login_required
-def index():
-    """Main dashboard page."""
-    return render_template("dashboard/dashboard.html")
+def index() -> str:
+    summary = analytics.user_summary(current_user)
+    recent_items = (
+        current_user.knowledge_items.order_by(KnowledgeItem.updated_at.desc()).limit(6).all()
+    )
+    bookmarks = db.session.scalars(
+        select(KnowledgeItem)
+        .join(Bookmark, Bookmark.item_id == KnowledgeItem.id)
+        .where(Bookmark.user_id == current_user.id)
+        .order_by(Bookmark.created_at.desc())
+        .limit(6)
+    ).all()
+    notifications = (
+        current_user.notifications.order_by(Notification.created_at.desc()).limit(8).all()
+    )
+    activity = analytics.recent_activity(10, user=current_user)
+    popular = analytics.most_viewed(5, user=current_user)
+    return render_template(
+        "dashboard/index.html",
+        summary=summary,
+        recent_items=recent_items,
+        bookmarks=bookmarks,
+        notifications=notifications,
+        activity=activity,
+        popular=popular,
+    )
 
 
-@dashboard.route("/analytics")
+@bp.get("/analytics")
 @login_required
-@role_required("admin")
-def analytics():
-    """Analytics dashboard page."""
-    return render_template("dashboard/analytics.html")
+@admin_required
+def analytics_page() -> str:
+    return render_template("dashboard/analytics.html", metrics=analytics.admin_metrics())
 
 
-@dashboard.route("/notifications")
+@bp.get("/analytics.json")
 @login_required
-def notifications():
-    """Notifications page."""
-    return render_template("dashboard/notifications.html")
+@admin_required
+def analytics_json() -> Response:
+    return jsonify(analytics.admin_metrics())
 
 
-# API Endpoints for dashboard data
-@dashboard.route("/api/stats/overview")
+@bp.get("/notifications")
 @login_required
-@cache.cached(timeout=300)  # Cache for 5 minutes
-def api_stats_overview():
-    """Get overview statistics."""
-    try:
-        # Basic counts
-        total_entries = KnowledgeEntry.query.count()
-        public_entries = KnowledgeEntry.query.filter_by(is_public=True).count()
-        private_entries = total_entries - public_entries
-        total_users = User.query.count()
+def notifications() -> str:
+    page, per_page = page_args()
+    stmt = (
+        select(Notification)
+        .where(Notification.user_id == current_user.id)
+        .order_by(Notification.created_at.desc())
+    )
+    if request.args.get("unread"):
+        stmt = stmt.where(Notification.is_read.is_(False))
+    return render_template("dashboard/notifications.html", page=paginate(stmt, page, per_page))
 
-        # User's personal stats
-        user_entries = KnowledgeEntry.query.filter_by(author_id=current_user.id).count()
-        user_public_entries = KnowledgeEntry.query.filter_by(
-            author_id=current_user.id, is_public=True
-        ).count()
 
-        # Recent activity (last 30 days)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        recent_entries = KnowledgeEntry.query.filter(
-            KnowledgeEntry.created_at >= thirty_days_ago
-        ).count()
-
-        recent_user_entries = KnowledgeEntry.query.filter(
-            KnowledgeEntry.author_id == current_user.id,
-            KnowledgeEntry.created_at >= thirty_days_ago,
-        ).count()
-
-        # Growth data (last 7 days)
-        growth_data = []
-        for i in range(7):
-            date = datetime.utcnow() - timedelta(days=i)
-            day_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
-            day_end = day_start + timedelta(days=1)
-
-            day_entries = KnowledgeEntry.query.filter(
-                KnowledgeEntry.created_at >= day_start, KnowledgeEntry.created_at < day_end
-            ).count()
-
-            growth_data.append({"date": day_start.strftime("%Y-%m-%d"), "entries": day_entries})
-
-        growth_data.reverse()  # Show oldest first
-
+@bp.post("/notifications/<int:notification_id>/read")
+@login_required
+def mark_read(notification_id: int) -> Response:
+    note = db.session.get(Notification, notification_id)
+    if note is None or note.user_id != current_user.id:
+        abort(404)
+    note.mark_read()
+    db.session.commit()
+    if request.accept_mimetypes.best == "application/json" or request.is_json:
         return jsonify(
-            {
-                "success": True,
-                "data": {
-                    "global": {
-                        "total_entries": total_entries,
-                        "public_entries": public_entries,
-                        "private_entries": private_entries,
-                        "total_users": total_users,
-                        "recent_entries": recent_entries,
-                    },
-                    "user": {
-                        "total_entries": user_entries,
-                        "public_entries": user_public_entries,
-                        "private_entries": user_entries - user_public_entries,
-                        "recent_entries": recent_user_entries,
-                    },
-                    "growth": growth_data,
-                },
-            }
+            {"ok": True, "unread": current_user.notifications.filter_by(is_read=False).count()}
         )
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting overview stats: {e}")
-        return jsonify({"success": False, "error": "Failed to load statistics"}), 500
+    return redirect(note.link or url_for("dashboard.notifications"))
 
 
-@dashboard.route("/api/stats/categories")
+@bp.post("/notifications/read-all")
 @login_required
-@cache.cached(timeout=600)  # Cache for 10 minutes
-def api_stats_categories():
-    """Get category distribution statistics."""
-    try:
-        # Global category stats
-        global_categories = (
-            db.session.query(KnowledgeEntry.category, func.count(KnowledgeEntry.id).label("count"))
-            .filter_by(is_public=True)
-            .group_by(KnowledgeEntry.category)
-            .all()
-        )
-
-        # User's category stats
-        user_categories = (
-            db.session.query(KnowledgeEntry.category, func.count(KnowledgeEntry.id).label("count"))
-            .filter_by(author_id=current_user.id)
-            .group_by(KnowledgeEntry.category)
-            .all()
-        )
-
-        # Format data for charts
-        global_data = [{"name": category, "value": count} for category, count in global_categories]
-
-        user_data = [{"name": category, "value": count} for category, count in user_categories]
-
-        return jsonify({"success": True, "data": {"global": global_data, "user": user_data}})
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting category stats: {e}")
-        return jsonify({"success": False, "error": "Failed to load category statistics"}), 500
+def mark_all_read() -> Response:
+    for note in current_user.notifications.filter_by(is_read=False).all():
+        note.mark_read()
+    db.session.commit()
+    flash("All notifications marked as read.", "success")
+    return redirect(url_for("dashboard.notifications"))
 
 
-@dashboard.route("/api/stats/activity")
+@bp.get("/activity")
 @login_required
-def api_stats_activity():
-    """Get activity statistics."""
-    try:
-        days = request.args.get("days", 30, type=int)
-        days = min(days, 365)  # Limit to 1 year
+def activity() -> str:
+    page, per_page = page_args()
+    from app.models import Activity
 
-        start_date = datetime.utcnow() - timedelta(days=days)
-
-        # Daily activity data
-        activity_data = []
-        for i in range(days):
-            date = start_date + timedelta(days=i)
-            day_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
-            day_end = day_start + timedelta(days=1)
-
-            # Total entries created that day
-            total_entries = KnowledgeEntry.query.filter(
-                KnowledgeEntry.created_at >= day_start, KnowledgeEntry.created_at < day_end
-            ).count()
-
-            # User's entries created that day
-            user_entries = KnowledgeEntry.query.filter(
-                KnowledgeEntry.author_id == current_user.id,
-                KnowledgeEntry.created_at >= day_start,
-                KnowledgeEntry.created_at < day_end,
-            ).count()
-
-            activity_data.append(
-                {
-                    "date": day_start.strftime("%Y-%m-%d"),
-                    "total": total_entries,
-                    "user": user_entries,
-                }
-            )
-
-        return jsonify({"success": True, "data": activity_data})
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting activity stats: {e}")
-        return jsonify({"success": False, "error": "Failed to load activity statistics"}), 500
-
-
-@dashboard.route("/api/recent/entries")
-@login_required
-def api_recent_entries():
-    """Get recent entries."""
-    try:
-        limit = min(request.args.get("limit", 10, type=int), 50)
-
-        # Get user's recent entries
-        recent_entries = (
-            KnowledgeEntry.query.filter_by(author_id=current_user.id)
-            .order_by(desc(KnowledgeEntry.created_at))
-            .limit(limit)
-            .all()
-        )
-
-        entries_data = []
-        for entry in recent_entries:
-            entries_data.append(
-                {
-                    "id": entry.id,
-                    "title": entry.title,
-                    "category": entry.category,
-                    "is_public": entry.is_public,
-                    "is_featured": entry.is_featured,
-                    "created_at": entry.created_at.isoformat(),
-                    "word_count": len(entry.content.split()) if entry.content else 0,
-                }
-            )
-
-        return jsonify({"success": True, "data": entries_data})
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting recent entries: {e}")
-        return jsonify({"success": False, "error": "Failed to load recent entries"}), 500
-
-
-@dashboard.route("/api/popular/entries")
-@login_required
-def api_popular_entries():
-    """Get popular entries (public only)."""
-    try:
-        limit = min(request.args.get("limit", 10, type=int), 50)
-
-        # For now, we'll use featured entries as "popular"
-        # In a real system, you'd track views/likes
-        popular_entries = (
-            KnowledgeEntry.query.filter_by(is_public=True, is_featured=True)
-            .order_by(desc(KnowledgeEntry.created_at))
-            .limit(limit)
-            .all()
-        )
-
-        # If no featured entries, fall back to recent public entries
-        if not popular_entries:
-            popular_entries = (
-                KnowledgeEntry.query.filter_by(is_public=True)
-                .order_by(desc(KnowledgeEntry.created_at))
-                .limit(limit)
-                .all()
-            )
-
-        entries_data = []
-        for entry in popular_entries:
-            entries_data.append(
-                {
-                    "id": entry.id,
-                    "title": entry.title,
-                    "author": entry.author.username if entry.author else "Unknown",
-                    "category": entry.category,
-                    "created_at": entry.created_at.isoformat(),
-                    "is_featured": entry.is_featured,
-                }
-            )
-
-        return jsonify({"success": True, "data": entries_data})
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting popular entries: {e}")
-        return jsonify({"success": False, "error": "Failed to load popular entries"}), 500
-
-
-@dashboard.route("/api/search/suggestions")
-@login_required
-def api_search_suggestions():
-    """Get search suggestions for dashboard quick search."""
-    try:
-        query = request.args.get("q", "").strip().lower()
-
-        if len(query) < 2:
-            return jsonify({"success": True, "data": []})
-
-        suggestions = []
-
-        # Search in user's entries
-        user_entries = (
-            KnowledgeEntry.query.filter(
-                KnowledgeEntry.author_id == current_user.id, KnowledgeEntry.title.contains(query)
-            )
-            .limit(5)
-            .all()
-        )
-
-        for entry in user_entries:
-            suggestions.append(
-                {
-                    "type": "entry",
-                    "title": entry.title,
-                    "category": entry.category,
-                    "url": f"/knowledge_vault/entry/{entry.id}",
-                    "is_own": True,
-                }
-            )
-
-        # Search in public entries
-        if len(suggestions) < 5:
-            public_entries = (
-                KnowledgeEntry.query.filter(
-                    KnowledgeEntry.author_id != current_user.id,
-                    KnowledgeEntry.is_public == True,
-                    KnowledgeEntry.title.contains(query),
-                )
-                .limit(5 - len(suggestions))
-                .all()
-            )
-
-            for entry in public_entries:
-                suggestions.append(
-                    {
-                        "type": "entry",
-                        "title": entry.title,
-                        "category": entry.category,
-                        "author": entry.author.username if entry.author else "Unknown",
-                        "url": f"/knowledge_vault/entry/{entry.id}",
-                        "is_own": False,
-                    }
-                )
-
-        return jsonify({"success": True, "data": suggestions})
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting search suggestions: {e}")
-        return jsonify({"success": False, "error": "Failed to load suggestions"}), 500
-
-
-@dashboard.route("/api/notifications")
-@login_required
-def api_notifications():
-    """Get user notifications."""
-    try:
-        # This is a placeholder - in a real system you'd have a notifications table
-        notifications = [
-            {
-                "id": 1,
-                "title": "Welcome to FlaskVerseHub!",
-                "message": "Thanks for joining our knowledge sharing platform.",
-                "type": "info",
-                "created_at": datetime.utcnow().isoformat(),
-                "read": False,
-            }
-        ]
-
-        # Add some dynamic notifications based on user activity
-        user_entries_count = KnowledgeEntry.query.filter_by(author_id=current_user.id).count()
-
-        if user_entries_count == 0:
-            notifications.append(
-                {
-                    "id": 2,
-                    "title": "Create your first entry!",
-                    "message": "Start sharing your knowledge by creating your first entry.",
-                    "type": "suggestion",
-                    "created_at": datetime.utcnow().isoformat(),
-                    "read": False,
-                    "action_url": "/knowledge_vault/create",
-                }
-            )
-        elif user_entries_count >= 5:
-            notifications.append(
-                {
-                    "id": 3,
-                    "title": "Great job!",
-                    "message": f"You have created {user_entries_count} entries. Keep sharing!",
-                    "type": "success",
-                    "created_at": datetime.utcnow().isoformat(),
-                    "read": False,
-                }
-            )
-
-        return jsonify({"success": True, "data": notifications})
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting notifications: {e}")
-        return jsonify({"success": False, "error": "Failed to load notifications"}), 500
-
-
-@dashboard.route("/api/system/health")
-@login_required
-@role_required("admin")
-def api_system_health():
-    """Get system health information."""
-    try:
-        import psutil
-        import sys
-
-        # System metrics
-        cpu_percent = psutil.cpu_percent(interval=1)
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage("/")
-
-        # Database metrics
-        db_size = (
-            db.session.execute("SELECT pg_database_size(current_database())").scalar()
-            if "postgresql" in current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-            else 0
-        )
-
-        health_data = {
-            "system": {
-                "cpu_usage": cpu_percent,
-                "memory_usage": memory.percent,
-                "memory_available": memory.available,
-                "disk_usage": disk.percent,
-                "disk_free": disk.free,
-            },
-            "application": {
-                "python_version": sys.version,
-                "flask_env": current_app.config.get("FLASK_ENV", "unknown"),
-                "debug_mode": current_app.debug,
-            },
-            "database": {
-                "size": db_size,
-                "total_entries": KnowledgeEntry.query.count(),
-                "total_users": User.query.count(),
-            },
-        }
-
-        return jsonify({"success": True, "data": health_data})
-
-    except Exception as e:
-        current_app.logger.error(f"Error getting system health: {e}")
-        return jsonify({"success": False, "error": "Failed to load system health"}), 500
+    stmt = select(Activity).order_by(Activity.created_at.desc())
+    if not current_user.is_admin:
+        stmt = stmt.where(Activity.user_id == current_user.id)
+    return render_template("dashboard/activity.html", page=paginate(stmt, page, per_page))

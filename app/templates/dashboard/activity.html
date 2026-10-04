@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+{% block title %}Activity · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 980px">
+  <h1 class="h3 mb-3"><i class="fa-solid fa-list-check me-2 text-primary"></i>{{ 'Audit trail' if current_user.is_admin else 'Your activity' }}</h1>
+  <div class="table-responsive"><table class="table table-sm align-middle">
+    <thead><tr><th>When</th><th>Action</th>{% if current_user.is_admin %}<th>User</th>{% endif %}<th>Resource</th><th>Details</th></tr></thead>
+    <tbody>
+    {% for row in page.items %}
+      <tr>
+        <td class="text-nowrap small text-muted" title="{{ row.created_at|datetime }}">{{ row.created_at|timeago }}</td>
+        <td><code>{{ row.action }}</code></td>
+        {% if current_user.is_admin %}<td>{{ row.user.username if row.user else '—' }}</td>{% endif %}
+        <td class="small">{% if row.resource_type %}{{ row.resource_type }} #{{ row.resource_id }}{% endif %}</td>
+        <td class="small text-muted">{{ row.description or (row.extra_data|tojson if row.extra_data else '') }}</td>
+      </tr>
+    {% else %}<tr><td colspan="5" class="text-muted">No activity recorded.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {{ render_pagination(page, 'dashboard.activity') }}
+</div>
+{% endblock %}

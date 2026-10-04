@@ -1,14 +1,9 @@
-# File: app/dashboard/__init__.py
-# 📊 Real-time Dashboard Blueprint Registration
+"""Dashboard: personal overview, notifications, analytics and real-time events."""
 
 from flask import Blueprint
 
-dashboard = Blueprint(
-    "dashboard",
-    __name__,
-    template_folder="templates",
-    static_folder="static",
-    static_url_path="/dashboard/static",
-)
+bp = Blueprint("dashboard", __name__)
 
-from . import routes, sockets, events
+from app.dashboard import routes, sockets  # noqa: E402, F401
+
+__all__ = ["bp"]

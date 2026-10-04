@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "macros/items.html" import item_card %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <h1 class="h3 mb-0">Welcome back, {{ current_user.full_name }}</h1>
+      <p class="text-muted small mb-0"><span class="status-dot status-online me-1" id="live-dot"></span><span id="live-status">Connecting to live updates…</span></p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-primary" href="{{ url_for('knowledge_vault.create') }}"><i class="fa-solid fa-plus me-1"></i>New item</a>
+      {% if current_user.is_admin %}<a class="btn btn-outline-secondary" href="{{ url_for('dashboard.analytics_page') }}"><i class="fa-solid fa-chart-line me-1"></i>Analytics</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    {% for label, value, icon, href in [
+      ('Your items', summary['items'], 'fa-file-lines', url_for('knowledge_vault.index', mine=1)),
+      ('Public', summary['public_items'], 'fa-globe', url_for('knowledge_vault.index', mine=1)),
+      ('Total views', summary['views'], 'fa-eye', url_for('knowledge_vault.index', mine=1, sort='views')),
+      ('Comments', summary['comments'], 'fa-comments', none),
+      ('Bookmarks', summary['bookmarks'], 'fa-bookmark', url_for('knowledge_vault.bookmarks')),
+      ('Unread', summary['unread_notifications'], 'fa-bell', url_for('dashboard.notifications', unread=1)),
+    ] %}
+    <div class="col-6 col-md-4 col-xl-2">
+      <a class="card stat-card h-100 text-decoration-none" href="{{ href or '#' }}">
+        <div class="card-body">
+          <i class="fa-solid {{ icon }} text-primary" aria-hidden="true"></i>
+          <div class="fs-3 fw-bold" {% if label == 'Unread' %}id="unread-count"{% endif %}>{{ value }}</div>
+          <div class="small text-muted">{{ label }}</div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 mb-0">Your recent items</h2>
+        <a class="small" href="{{ url_for('knowledge_vault.index', mine=1) }}">All items</a>
+      </div>
+      {% if recent_items %}
+      <div class="row g-3 mb-4">{% for item in recent_items %}<div class="col-md-6">{{ item_card(item, show_author=false) }}</div>{% endfor %}</div>
+      {% else %}
+      <div class="card mb-4"><div class="card-body text-muted">You have not written anything yet. <a href="{{ url_for('knowledge_vault.create') }}">Create your first item.</a></div></div>
+      {% endif %}
+
+      <h2 class="h5 mb-2">Live feed</h2>
+      <ul class="list-group mb-4" id="live-feed">
+        <li class="list-group-item text-muted small" id="live-feed-empty">Item changes made by anyone appear here in real time.</li>
+      </ul>
+
+      <h2 class="h5 mb-2">Popular right now</h2>
+      <div class="list-group">
+        {% for item in popular %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{{ url_for('knowledge_vault.detail', slug=item.slug) }}">
+          <span>{{ item.title }} <span class="text-muted small">by {{ item.author.username }}</span></span><span class="text-muted small"><i class="fa-regular fa-eye me-1"></i>{{ item.view_count }}</span>
+        </a>
+        {% else %}<div class="list-group-item text-muted">Nothing yet.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center"><span class="fw-semibold">Notifications</span><a class="small" href="{{ url_for('dashboard.notifications') }}">All</a></div>
+        <ul class="list-group list-group-flush" id="notification-list">
+          {% for note in notifications %}
+          <li class="list-group-item {% if not note.is_read %}fw-semibold{% endif %} small">
+            <a class="text-decoration-none" href="{{ url_for('dashboard.mark_read', notification_id=note.id) }}" onclick="event.preventDefault(); FVH.markRead({{ note.id }}, {{ (note.link or url_for('dashboard.notifications'))|tojson }});">{{ note.title }}</a>
+            <div class="text-muted">{{ note.created_at|timeago }}</div>
+          </li>
+          {% else %}<li class="list-group-item text-muted small">No notifications.</li>{% endfor %}
+        </ul>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center"><span class="fw-semibold">Your activity</span><a class="small" href="{{ url_for('dashboard.activity') }}">All</a></div>
+        <ul class="list-group list-group-flush">
+          {% for row in activity %}
+          <li class="list-group-item small"><code>{{ row.action }}</code> <span class="text-muted">· {{ row.created_at|timeago }}</span></li>
+          {% else %}<li class="list-group-item text-muted small">No activity yet.</li>{% endfor %}
+        </ul>
+      </div>
+      {% if bookmarks %}
+      <div class="card">
+        <div class="card-header fw-semibold">Bookmarks</div>
+        <ul class="list-group list-group-flush">
+          {% for item in bookmarks %}<li class="list-group-item small"><a href="{{ url_for('knowledge_vault.detail', slug=item.slug) }}">{{ item.title }}</a></li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/socket.js') }}"></script>
+{% endblock %}

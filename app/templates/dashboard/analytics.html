@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Analytics · {{ app_name }}{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0"><i class="fa-solid fa-chart-line me-2 text-primary"></i>Analytics</h1>
+    <span class="small text-muted">Generated {{ metrics.generated_at|replace('T', ' ')|truncate(19, true, '') }} UTC · <a href="{{ url_for('dashboard.analytics_json') }}">JSON</a></span>
+  </div>
+  <div class="row g-3 mb-4">
+    {% for key, icon in [('users','fa-users'),('items','fa-file-lines'),('public_items','fa-globe'),('views','fa-eye'),('comments','fa-comments'),('bookmarks','fa-bookmark'),('categories','fa-folder-tree'),('tags','fa-tags')] %}
+    <div class="col-6 col-md-3 col-xl">
+      <div class="card stat-card h-100"><div class="card-body">
+        <i class="fa-solid {{ icon }} text-primary"></i>
+        <div class="fs-3 fw-bold">{{ metrics.overview[key] }}</div>
+        <div class="small text-muted text-capitalize">{{ key.replace('_', ' ') }}</div>
+      </div></div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="row g-4">
+    <div class="col-lg-8"><div class="card h-100"><div class="card-header fw-semibold">Items created per day (30 days)</div><div class="card-body"><canvas id="chart-items" height="110"></canvas></div></div></div>
+    <div class="col-lg-4"><div class="card h-100"><div class="card-header fw-semibold">By category</div><div class="card-body"><canvas id="chart-categories"></canvas></div></div></div>
+    <div class="col-lg-4"><div class="card h-100"><div class="card-header fw-semibold">Status</div><div class="card-body"><canvas id="chart-status"></canvas></div></div></div>
+    <div class="col-lg-4"><div class="card h-100"><div class="card-header fw-semibold">Difficulty</div><div class="card-body"><canvas id="chart-difficulty"></canvas></div></div></div>
+    <div class="col-lg-4">
+      <div class="card h-100"><div class="card-header fw-semibold">Reading time (minutes)</div>
+        <table class="table table-sm mb-0">
+          {% for k, v in metrics.reading_time.items() %}<tr><th class="fw-normal text-muted text-capitalize">{{ k }}</th><td class="text-end">{{ v }}</td></tr>{% endfor %}
+          <tr><th class="fw-normal text-muted">View concentration (Gini)</th><td class="text-end">{{ metrics.view_gini }}</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col-lg-6"><div class="card h-100"><div class="card-header fw-semibold">Top tags</div><div class="card-body"><canvas id="chart-tags"></canvas></div></div></div>
+    <div class="col-lg-6">
+      <div class="card h-100"><div class="card-header fw-semibold">Top authors</div>
+        <table class="table table-sm mb-0"><thead><tr><th>Author</th><th class="text-end">Items</th><th class="text-end">Views</th></tr></thead>
+          <tbody>{% for a in metrics.authors %}<tr><td>{{ a.username }}</td><td class="text-end">{{ a.items }}</td><td class="text-end">{{ a.views }}</td></tr>{% else %}<tr><td colspan="3" class="text-muted">No authors yet.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card"><div class="card-header fw-semibold">Activity (7 days)</div>
+        <div class="card-body d-flex flex-wrap gap-2">
+          {% for row in metrics.activity %}<span class="badge text-bg-light border fs-6"><code>{{ row.action }}</code> {{ row.count }}</span>{% else %}<span class="text-muted">No activity recorded.</span>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script id="metrics-data" type="application/json">{{ metrics|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

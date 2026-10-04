@@ -2,9 +2,13 @@
 {% from "macros/items.html" import item_card %}
 {% from "macros/forms.html" import render_field %}
 {% block title %}{{ item.title }} · {{ app_name }}{% endblock %}
+{% block scripts %}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/socket.js') }}"></script>
+{% endblock %}
 {% block meta_description %}{{ item.summary or item.content|excerpt(150) }}{% endblock %}
 {% block content %}
-<div class="container py-4">
+<div class="container py-4" data-item-slug="{{ item.slug }}">
   <nav aria-label="breadcrumb"><ol class="breadcrumb small">
     <li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.index') }}">Knowledge Vault</a></li>
     {% if item.category %}<li class="breadcrumb-item"><a href="{{ url_for('knowledge_vault.index', category=item.category.slug) }}">{{ item.category.name }}</a></li>{% endif %}
