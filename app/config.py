@@ -157,7 +157,7 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     ENV_NAME = "testing"
     TESTING = True
-    SECRET_KEY = "testing-secret-key"  # noqa: S105 - deterministic test secret
+    SECRET_KEY = "testing-secret-key-with-at-least-32-bytes!"  # noqa: S105 - deterministic test secret
     JWT_SECRET_KEY = SECRET_KEY
     SQLALCHEMY_DATABASE_URI = "sqlite://"
     SQLALCHEMY_ENGINE_OPTIONS: dict[str, object] = {

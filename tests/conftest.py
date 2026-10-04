@@ -37,16 +37,19 @@ def _register_test_routes(application: Flask) -> None:
 
     The session-scoped app context stays pushed for the whole run, so Flask
     reuses it for every test-client request and ``g`` persists between
-    requests. Flask-Login caches the resolved user on ``g``; clearing it keeps
-    requests independent exactly as they are in production.
+    requests. Flask-Login, Flask-JWT-Extended and the API auth layer cache the
+    resolved caller on ``g``; clearing request-scoped keys keeps requests
+    independent exactly as they are in production.
     """
     from flask import g
 
     from app.errors import APIError
 
     @application.before_request
-    def _reset_login_state() -> None:
-        g.pop("_login_user", None)
+    def _reset_request_state() -> None:
+        for key in list(vars(g)):
+            if key not in {"request_id", "request_started"}:
+                g.pop(key, None)
 
     @application.get("/_test/api-error")
     def _api_error() -> NoReturn:

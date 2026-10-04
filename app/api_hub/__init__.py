@@ -1,8 +1,9 @@
-# File: app/api_hub/__init__.py
-# 🔌 API Hub Blueprint Registration
+"""API Hub: versioned REST and GraphQL interfaces over the domain services."""
 
 from flask import Blueprint
 
-api_hub = Blueprint("api_hub", __name__, url_prefix="/api/v1")
+bp = Blueprint("api_hub", __name__)
 
-from . import rest_routes, graphql_routes
+from app.api_hub import graphql_routes, rest_routes  # noqa: E402, F401
+
+__all__ = ["bp"]

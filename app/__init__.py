@@ -97,6 +97,7 @@ def _init_extensions(app: Flask) -> None:
 
 
 def _register_blueprints(app: Flask) -> None:
+    from app.api_hub import bp as api_bp
     from app.auth import bp as auth_bp
     from app.knowledge_vault import bp as vault_bp
     from app.main import bp as main_bp
@@ -104,6 +105,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(vault_bp, url_prefix="/knowledge")
+    app.register_blueprint(api_bp, url_prefix="/api/v1")
 
 
 def _register_infrastructure(app: Flask) -> None:

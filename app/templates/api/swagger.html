@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }} API reference</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/logo.svg') }}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+    <style>body{margin:0}.topbar{display:none}.fvh-bar{font-family:Inter,system-ui,sans-serif;background:#0d6efd;color:#fff;padding:.6rem 1rem;display:flex;justify-content:space-between;align-items:center}.fvh-bar a{color:#fff}</style>
+  </head>
+  <body>
+    <div class="fvh-bar"><strong>{{ app_name }} API v1</strong><span><a href="{{ url_for('api_hub.graphql') }}">GraphiQL</a> · <a href="{{ url_for('main.index') }}">Back to site</a></span></div>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
+    <script>
+      window.ui = SwaggerUIBundle({ url: "{{ url_for('api_hub.openapi') }}", dom_id: "#swagger-ui", deepLinking: true, persistAuthorization: true, tryItOutEnabled: true });
+    </script>
+  </body>
+</html>

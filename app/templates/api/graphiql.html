@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }} GraphiQL</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/logo.svg') }}" />
+    <link rel="stylesheet" href="https://unpkg.com/graphiql@3/graphiql.min.css" />
+    <style>body{margin:0;height:100vh}#graphiql{height:100vh}</style>
+  </head>
+  <body>
+    <div id="graphiql">Loading…</div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/graphiql@3/graphiql.min.js"></script>
+    <script>
+      const token = window.localStorage.getItem("fvh_api_token");
+      const headers = token ? { Authorization: "Bearer " + token } : {};
+      const fetcher = GraphiQL.createFetcher({ url: "{{ url_for('api_hub.graphql') }}", headers });
+      const defaultQuery = `# Welcome to {{ app_name }} GraphiQL.\n# Store a JWT with localStorage.setItem("fvh_api_token", "<token>") to run authenticated operations.\n{\n  search(query: "flask blueprints", perPage: 5) {\n    ranker\n    terms\n    items { title slug score tags author { username } }\n  }\n}`;
+      ReactDOM.createRoot(document.getElementById("graphiql")).render(React.createElement(GraphiQL, { fetcher, defaultQuery }));
+    </script>
+  </body>
+</html>

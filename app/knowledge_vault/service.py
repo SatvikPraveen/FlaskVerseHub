@@ -128,10 +128,15 @@ def get_by_slug(slug: str, *, user: User | None) -> KnowledgeItem | None:
 
 
 def _apply_fields(item: KnowledgeItem, data: dict[str, Any], *, actor: User) -> None:
-    item.title = sanitize_text(data["title"], max_length=200)
-    item.summary = sanitize_text(data.get("summary"), max_length=500) or None
-    item.content = sanitize_html(data["content"])
-    item.source_url = (data.get("source_url") or "").strip() or None
+    """Apply a (possibly partial) field mapping; absent keys are left untouched."""
+    if "title" in data:
+        item.title = sanitize_text(data["title"], max_length=200)
+    if "summary" in data:
+        item.summary = sanitize_text(data.get("summary"), max_length=500) or None
+    if "content" in data:
+        item.content = sanitize_html(data["content"])
+    if "source_url" in data:
+        item.source_url = (data.get("source_url") or "").strip() or None
     if data.get("difficulty"):
         item.difficulty = Difficulty(data["difficulty"])
     if data.get("status"):

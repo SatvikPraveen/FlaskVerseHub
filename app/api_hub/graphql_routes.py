@@ -1,404 +1,417 @@
-# File: app/api_hub/graphql_routes.py
-# 🔌 GraphQL Endpoint Implementation
+"""GraphQL schema and endpoint (graphene 3).
 
-from flask import request, jsonify, current_app
-from flask_login import current_user
+The schema is a thin projection of the domain services, so authorization
+and visibility rules are identical to the REST and HTML interfaces.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
 import graphene
-from graphene import relay
-from graphene_sqlalchemy import SQLAlchemyObjectType, SQLAlchemyConnectionField
-from sqlalchemy import or_, desc
+from flask import Response, jsonify, render_template, request
+from sqlalchemy import select
 
-from . import api_hub
-from ..models import KnowledgeEntry as KnowledgeEntryModel, User as UserModel, db
-from ..security.rate_limiting import rate_limit
-
-
-# GraphQL Object Types
-class User(SQLAlchemyObjectType):
-    """GraphQL User type."""
-
-    class Meta:
-        model = UserModel
-        interfaces = (relay.Node,)
-        exclude_fields = ("password_hash",)  # Never expose password hash
-
-
-class KnowledgeEntry(SQLAlchemyObjectType):
-    """GraphQL Knowledge Entry type."""
-
-    class Meta:
-        model = KnowledgeEntryModel
-        interfaces = (relay.Node,)
-
-    # Add computed fields
-    word_count = graphene.Int()
-    reading_time = graphene.Int()
-    tags_list = graphene.List(graphene.String)
-    excerpt = graphene.String()
-
-    def resolve_word_count(self, info):
-        """Calculate word count of content."""
-        return len(self.content.split()) if self.content else 0
-
-    def resolve_reading_time(self, info):
-        """Estimate reading time in minutes."""
-        word_count = self.resolve_word_count(info)
-        return max(1, round(word_count / 200))
-
-    def resolve_tags_list(self, info):
-        """Convert comma-separated tags to list."""
-        if self.tags:
-            return [tag.strip() for tag in self.tags.split(",") if tag.strip()]
-        return []
-
-    def resolve_excerpt(self, info):
-        """Generate excerpt from content."""
-        if self.content:
-            import re
-
-            clean_content = re.sub(r"<[^>]+>", "", self.content)
-            return clean_content[:200] + "..." if len(clean_content) > 200 else clean_content
-        return ""
+from app.api_hub import bp
+from app.api_hub.auth import resolve_api_user
+from app.errors import APIError
+from app.extensions import db
+from app.knowledge_vault import service as vault_service
+from app.models import (
+    Category as CategoryModel,
+    KnowledgeItem as ItemModel,
+    Tag as TagModel,
+    User as UserModel,
+)
+from app.search import service as search_service
+from app.utils.pagination import paginate
 
 
-# Input Types for mutations
-class CreateKnowledgeEntryInput(graphene.InputObjectType):
-    """Input for creating knowledge entries."""
-
-    title = graphene.String(required=True)
-    description = graphene.String()
-    content = graphene.String(required=True)
-    category = graphene.String(required=True)
-    tags = graphene.String()
-    source_url = graphene.String()
-    is_public = graphene.Boolean()
-    is_featured = graphene.Boolean()
+def _viewer(info: graphene.ResolveInfo) -> UserModel | None:
+    return info.context.get("user")
 
 
-class UpdateKnowledgeEntryInput(graphene.InputObjectType):
-    """Input for updating knowledge entries."""
-
-    id = graphene.ID(required=True)
-    title = graphene.String()
-    description = graphene.String()
-    content = graphene.String()
-    category = graphene.String()
-    tags = graphene.String()
-    source_url = graphene.String()
-    is_public = graphene.Boolean()
-    is_featured = graphene.Boolean()
+def _require_user(info: graphene.ResolveInfo) -> UserModel:
+    user = _viewer(info)
+    if user is None:
+        raise PermissionError("Authentication required.")
+    return user
 
 
-# Query Class
-class Query(graphene.ObjectType):
-    """GraphQL Query root."""
+class User(graphene.ObjectType):
+    id = graphene.Int()
+    username = graphene.String()
+    full_name = graphene.String()
+    bio = graphene.String()
+    is_admin = graphene.Boolean()
+    item_count = graphene.Int()
 
-    node = relay.Node.Field()
-
-    # Knowledge Entry queries
-    all_entries = SQLAlchemyConnectionField(KnowledgeEntry.connection)
-    entry = graphene.Field(KnowledgeEntry, id=graphene.ID(required=True))
-    search_entries = graphene.List(KnowledgeEntry, query=graphene.String(required=True))
-    entries_by_category = graphene.List(KnowledgeEntry, category=graphene.String(required=True))
-
-    # User queries
-    all_users = SQLAlchemyConnectionField(User.connection)
-    user = graphene.Field(User, id=graphene.ID(required=True))
-    current_user = graphene.Field(User)
-
-    # Statistics
-    entry_count = graphene.Int()
-    public_entry_count = graphene.Int()
-    user_count = graphene.Int()
-
-    def resolve_entry(self, info, id):
-        """Resolve single entry by ID."""
-        entry = KnowledgeEntryModel.query.get(id)
-        if not entry:
-            return None
-
-        # Check permissions
-        if not entry.is_public:
-            if not current_user.is_authenticated:
-                return None
-            if entry.author_id != current_user.id and not current_user.is_admin:
-                return None
-
-        return entry
-
-    def resolve_search_entries(self, info, query):
-        """Search entries by query."""
-        entries_query = KnowledgeEntryModel.query.filter(
-            or_(
-                KnowledgeEntryModel.title.contains(query),
-                KnowledgeEntryModel.content.contains(query),
-                KnowledgeEntryModel.tags.contains(query),
+    def resolve_item_count(self: Any, info: graphene.ResolveInfo) -> int:
+        return int(
+            db.session.scalar(
+                select(db.func.count()).select_from(
+                    ItemModel.visible_to(_viewer(info))
+                    .where(ItemModel.author_id == self.id)
+                    .subquery()
+                )
             )
+            or 0
         )
 
-        # Apply permissions
-        if not current_user.is_authenticated:
-            entries_query = entries_query.filter_by(is_public=True)
-        elif not current_user.is_admin:
-            entries_query = entries_query.filter(
-                or_(
-                    KnowledgeEntryModel.is_public == True,
-                    KnowledgeEntryModel.author_id == current_user.id,
-                )
-            )
 
-        return entries_query.order_by(desc(KnowledgeEntryModel.created_at)).limit(20).all()
-
-    def resolve_entries_by_category(self, info, category):
-        """Get entries by category."""
-        entries_query = KnowledgeEntryModel.query.filter_by(category=category)
-
-        # Apply permissions
-        if not current_user.is_authenticated:
-            entries_query = entries_query.filter_by(is_public=True)
-        elif not current_user.is_admin:
-            entries_query = entries_query.filter(
-                or_(
-                    KnowledgeEntryModel.is_public == True,
-                    KnowledgeEntryModel.author_id == current_user.id,
-                )
-            )
-
-        return entries_query.order_by(desc(KnowledgeEntryModel.created_at)).all()
-
-    def resolve_user(self, info, id):
-        """Resolve user by ID."""
-        if not current_user.is_authenticated:
-            return None
-
-        user = UserModel.query.get(id)
-        if not user:
-            return None
-
-        # Users can only see their own profile unless admin
-        if current_user.id != user.id and not current_user.is_admin:
-            return None
-
-        return user
-
-    def resolve_current_user(self, info):
-        """Get current authenticated user."""
-        return current_user if current_user.is_authenticated else None
-
-    def resolve_entry_count(self, info):
-        """Get total entry count."""
-        return KnowledgeEntryModel.query.count()
-
-    def resolve_public_entry_count(self, info):
-        """Get public entry count."""
-        return KnowledgeEntryModel.query.filter_by(is_public=True).count()
-
-    def resolve_user_count(self, info):
-        """Get total user count."""
-        return UserModel.query.count()
+class Category(graphene.ObjectType):
+    id = graphene.Int()
+    name = graphene.String()
+    slug = graphene.String()
+    description = graphene.String()
+    color = graphene.String()
+    item_count = graphene.Int()
 
 
-# Mutations
-class CreateKnowledgeEntry(graphene.Mutation):
-    """Create new knowledge entry."""
+class Tag(graphene.ObjectType):
+    id = graphene.Int()
+    name = graphene.String()
+    slug = graphene.String()
+    usage_count = graphene.Int()
 
+
+class Comment(graphene.ObjectType):
+    id = graphene.Int()
+    body = graphene.String()
+    is_deleted = graphene.Boolean()
+    parent_id = graphene.Int()
+    author = graphene.Field(User)
+    created_at = graphene.DateTime()
+
+    def resolve_body(self: Any, _info: graphene.ResolveInfo) -> str:
+        return "" if self.is_deleted else str(self.body)
+
+
+class Revision(graphene.ObjectType):
+    version = graphene.Int()
+    title = graphene.String()
+    summary = graphene.String()
+    content = graphene.String()
+    note = graphene.String()
+    editor = graphene.Field(User)
+    created_at = graphene.DateTime()
+
+
+class Item(graphene.ObjectType):
+    id = graphene.Int()
+    title = graphene.String()
+    slug = graphene.String()
+    summary = graphene.String()
+    content = graphene.String()
+    status = graphene.String()
+    difficulty = graphene.String()
+    is_public = graphene.Boolean()
+    is_featured = graphene.Boolean()
+    version = graphene.Int()
+    view_count = graphene.Int()
+    word_count = graphene.Int()
+    reading_time = graphene.Int()
+    tags = graphene.List(graphene.String)
+    category = graphene.Field(Category)
+    author = graphene.Field(User)
+    comments = graphene.List(Comment)
+    revisions = graphene.List(Revision)
+    created_at = graphene.DateTime()
+    updated_at = graphene.DateTime()
+    score = graphene.Float(description="Relevance score when returned from `search`.")
+
+    def resolve_status(self: Any, _info: graphene.ResolveInfo) -> str:
+        return str(self.status.value)
+
+    def resolve_difficulty(self: Any, _info: graphene.ResolveInfo) -> str:
+        return str(self.difficulty.value)
+
+    def resolve_tags(self: Any, _info: graphene.ResolveInfo) -> list[str]:
+        return list(self.tag_names)
+
+    def resolve_comments(self: Any, _info: graphene.ResolveInfo) -> list[Any]:
+        return list(self.comments.all())
+
+    def resolve_revisions(self: Any, _info: graphene.ResolveInfo) -> list[Any]:
+        return list(self.revisions.all())
+
+    def resolve_score(self: Any, _info: graphene.ResolveInfo) -> float | None:
+        return getattr(self, "_score", None)
+
+
+class ItemPage(graphene.ObjectType):
+    items = graphene.List(Item)
+    total = graphene.Int()
+    page = graphene.Int()
+    pages = graphene.Int()
+    has_next = graphene.Boolean()
+
+
+class SearchResult(graphene.ObjectType):
+    items = graphene.List(Item)
+    total = graphene.Int()
+    terms = graphene.List(graphene.String)
+    ranker = graphene.String()
+    elapsed_ms = graphene.Float()
+
+
+class Query(graphene.ObjectType):
+    me = graphene.Field(User)
+    item = graphene.Field(Item, slug=graphene.String(), id=graphene.Int())
+    items = graphene.Field(
+        ItemPage,
+        page=graphene.Int(default_value=1),
+        per_page=graphene.Int(default_value=20),
+        q=graphene.String(),
+        category=graphene.String(),
+        tag=graphene.String(),
+        difficulty=graphene.String(),
+        mine=graphene.Boolean(default_value=False),
+        featured=graphene.Boolean(default_value=False),
+        sort=graphene.String(default_value="updated"),
+    )
+    search = graphene.Field(
+        SearchResult,
+        query=graphene.String(required=True),
+        page=graphene.Int(default_value=1),
+        per_page=graphene.Int(default_value=10),
+    )
+    categories = graphene.List(Category)
+    tags = graphene.List(Tag, limit=graphene.Int(default_value=50))
+    user = graphene.Field(User, username=graphene.String(required=True))
+
+    def resolve_me(self: Any, info: graphene.ResolveInfo) -> UserModel | None:
+        return _viewer(info)
+
+    def resolve_item(
+        self: Any, info: graphene.ResolveInfo, slug: str | None = None, id: int | None = None
+    ) -> ItemModel | None:
+        if slug:
+            return vault_service.get_by_slug(slug, user=_viewer(info))
+        if id is not None:
+            item = db.session.get(ItemModel, id)
+            return item if item is not None and item.is_visible_to(_viewer(info)) else None
+        return None
+
+    def resolve_items(
+        self: Any, info: graphene.ResolveInfo, page: int, per_page: int, **filters: Any
+    ) -> dict[str, Any]:
+        user = _viewer(info)
+        item_filters = vault_service.ItemFilters(
+            query=filters.get("q") or None,
+            category=filters.get("category") or None,
+            tag=filters.get("tag") or None,
+            difficulty=filters.get("difficulty") or None,
+            mine=bool(filters.get("mine")) and user is not None,
+            featured=True if filters.get("featured") else None,
+            sort=str(filters.get("sort"))
+            if filters.get("sort") in vault_service.SORT_OPTIONS
+            else "updated",
+        )
+        listing = paginate(
+            vault_service.build_listing(item_filters, user=user),
+            max(1, page),
+            max(1, min(per_page, 100)),
+        )
+        return {
+            "items": listing.items,
+            "total": listing.total,
+            "page": listing.page,
+            "pages": listing.pages,
+            "has_next": listing.has_next,
+        }
+
+    def resolve_search(
+        self: Any, info: graphene.ResolveInfo, query: str, page: int, per_page: int
+    ) -> dict[str, Any]:
+        result = search_service.search_items(
+            query, user=_viewer(info), page=max(1, page), per_page=max(1, min(per_page, 100))
+        )
+        for item in result.items:
+            item._score = result.scores.get(item.id)  # type: ignore[attr-defined]
+        return {
+            "items": result.items,
+            "total": result.total,
+            "terms": result.terms,
+            "ranker": result.ranker,
+            "elapsed_ms": result.elapsed_ms,
+        }
+
+    def resolve_categories(self: Any, _info: graphene.ResolveInfo) -> list[CategoryModel]:
+        return list(db.session.scalars(select(CategoryModel).order_by(CategoryModel.name)).all())
+
+    def resolve_tags(self: Any, _info: graphene.ResolveInfo, limit: int) -> list[TagModel]:
+        return list(
+            db.session.scalars(
+                select(TagModel).order_by(TagModel.name).limit(max(1, min(limit, 500)))
+            ).all()
+        )
+
+    def resolve_user(self: Any, _info: graphene.ResolveInfo, username: str) -> UserModel | None:
+        return db.session.scalar(
+            select(UserModel).where(db.func.lower(UserModel.username) == username.lower())
+        )
+
+
+class ItemInput(graphene.InputObjectType):
+    title = graphene.String()
+    content = graphene.String()
+    summary = graphene.String()
+    tags = graphene.List(graphene.String)
+    category_id = graphene.Int()
+    difficulty = graphene.String()
+    status = graphene.String()
+    source_url = graphene.String()
+    is_public = graphene.Boolean()
+    is_featured = graphene.Boolean()
+
+
+def _validate_item_input(data: dict[str, Any], *, creating: bool) -> dict[str, Any]:
+    from app.api_hub.schemas import ItemCreateInput, ItemUpdateInput, load_or_422
+
+    return load_or_422(ItemCreateInput() if creating else ItemUpdateInput(), data)
+
+
+class CreateItem(graphene.Mutation):
     class Arguments:
-        input = CreateKnowledgeEntryInput(required=True)
+        input = ItemInput(required=True)
 
-    entry = graphene.Field(KnowledgeEntry)
-    success = graphene.Boolean()
-    message = graphene.String()
+    item = graphene.Field(Item)
 
-    def mutate(self, info, input):
-        if not current_user.is_authenticated:
-            return CreateKnowledgeEntry(success=False, message="Authentication required")
-
-        try:
-            entry = KnowledgeEntryModel(
-                title=input.title,
-                description=input.description or "",
-                content=input.content,
-                category=input.category,
-                tags=input.tags or "",
-                source_url=input.source_url,
-                is_public=input.is_public or False,
-                is_featured=input.is_featured and current_user.is_admin,
-                author_id=current_user.id,
-            )
-
-            db.session.add(entry)
-            db.session.commit()
-
-            return CreateKnowledgeEntry(
-                entry=entry, success=True, message="Entry created successfully"
-            )
-
-        except Exception as e:
-            db.session.rollback()
-            return CreateKnowledgeEntry(success=False, message=str(e))
+    def mutate(self: Any, info: graphene.ResolveInfo, input: ItemInput) -> CreateItem:
+        user = _require_user(info)
+        data = _validate_item_input(
+            {k: v for k, v in dict(input).items() if v is not None}, creating=True
+        )
+        return CreateItem(item=vault_service.create_item(data, author=user))
 
 
-class UpdateKnowledgeEntry(graphene.Mutation):
-    """Update knowledge entry."""
-
+class UpdateItem(graphene.Mutation):
     class Arguments:
-        input = UpdateKnowledgeEntryInput(required=True)
+        slug = graphene.String(required=True)
+        input = ItemInput(required=True)
+        change_note = graphene.String()
 
-    entry = graphene.Field(KnowledgeEntry)
-    success = graphene.Boolean()
-    message = graphene.String()
+    item = graphene.Field(Item)
 
-    def mutate(self, info, input):
-        if not current_user.is_authenticated:
-            return UpdateKnowledgeEntry(success=False, message="Authentication required")
-
-        entry = KnowledgeEntryModel.query.get(input.id)
-        if not entry:
-            return UpdateKnowledgeEntry(success=False, message="Entry not found")
-
-        # Check permissions
-        if entry.author_id != current_user.id and not current_user.is_admin:
-            return UpdateKnowledgeEntry(success=False, message="Permission denied")
-
-        try:
-            if input.title is not None:
-                entry.title = input.title
-            if input.description is not None:
-                entry.description = input.description
-            if input.content is not None:
-                entry.content = input.content
-            if input.category is not None:
-                entry.category = input.category
-            if input.tags is not None:
-                entry.tags = input.tags
-            if input.source_url is not None:
-                entry.source_url = input.source_url
-            if input.is_public is not None:
-                entry.is_public = input.is_public
-            if input.is_featured is not None and current_user.is_admin:
-                entry.is_featured = input.is_featured
-
-            db.session.commit()
-
-            return UpdateKnowledgeEntry(
-                entry=entry, success=True, message="Entry updated successfully"
-            )
-
-        except Exception as e:
-            db.session.rollback()
-            return UpdateKnowledgeEntry(success=False, message=str(e))
+    def mutate(
+        self: Any,
+        info: graphene.ResolveInfo,
+        slug: str,
+        input: ItemInput,
+        change_note: str | None = None,
+    ) -> UpdateItem:
+        user = _require_user(info)
+        item = vault_service.get_by_slug(slug, user=user)
+        if item is None:
+            raise LookupError("Knowledge item not found.")
+        if not vault_service.can_edit(item, user):
+            raise PermissionError("You may not modify this item.")
+        data = _validate_item_input(
+            {k: v for k, v in dict(input).items() if v is not None}, creating=False
+        )
+        return UpdateItem(item=vault_service.update_item(item, data, actor=user, note=change_note))
 
 
-class DeleteKnowledgeEntry(graphene.Mutation):
-    """Delete knowledge entry."""
-
+class DeleteItem(graphene.Mutation):
     class Arguments:
-        id = graphene.ID(required=True)
+        slug = graphene.String(required=True)
 
-    success = graphene.Boolean()
-    message = graphene.String()
+    ok = graphene.Boolean()
 
-    def mutate(self, info, id):
-        if not current_user.is_authenticated:
-            return DeleteKnowledgeEntry(success=False, message="Authentication required")
+    def mutate(self: Any, info: graphene.ResolveInfo, slug: str) -> DeleteItem:
+        user = _require_user(info)
+        item = vault_service.get_by_slug(slug, user=user)
+        if item is None:
+            raise LookupError("Knowledge item not found.")
+        if not vault_service.can_edit(item, user):
+            raise PermissionError("You may not modify this item.")
+        vault_service.delete_item(item, actor=user)
+        return DeleteItem(ok=True)
 
-        entry = KnowledgeEntryModel.query.get(id)
-        if not entry:
-            return DeleteKnowledgeEntry(success=False, message="Entry not found")
 
-        # Check permissions
-        if entry.author_id != current_user.id and not current_user.is_admin:
-            return DeleteKnowledgeEntry(success=False, message="Permission denied")
+class AddComment(graphene.Mutation):
+    class Arguments:
+        slug = graphene.String(required=True)
+        body = graphene.String(required=True)
+        parent_id = graphene.Int()
 
-        try:
-            db.session.delete(entry)
-            db.session.commit()
+    comment = graphene.Field(Comment)
 
-            return DeleteKnowledgeEntry(success=True, message="Entry deleted successfully")
+    def mutate(
+        self: Any, info: graphene.ResolveInfo, slug: str, body: str, parent_id: int | None = None
+    ) -> AddComment:
+        user = _require_user(info)
+        item = vault_service.get_by_slug(slug, user=user)
+        if item is None:
+            raise LookupError("Knowledge item not found.")
+        if not body.strip():
+            raise ValueError("Comment body must not be empty.")
+        return AddComment(
+            comment=vault_service.add_comment(item, body, author=user, parent_id=parent_id)
+        )
 
-        except Exception as e:
-            db.session.rollback()
-            return DeleteKnowledgeEntry(success=False, message=str(e))
+
+class ToggleBookmark(graphene.Mutation):
+    class Arguments:
+        slug = graphene.String(required=True)
+
+    bookmarked = graphene.Boolean()
+
+    def mutate(self: Any, info: graphene.ResolveInfo, slug: str) -> ToggleBookmark:
+        user = _require_user(info)
+        item = vault_service.get_by_slug(slug, user=user)
+        if item is None:
+            raise LookupError("Knowledge item not found.")
+        return ToggleBookmark(bookmarked=vault_service.toggle_bookmark(item, user=user))
 
 
 class Mutation(graphene.ObjectType):
-    """GraphQL Mutation root."""
+    create_item = CreateItem.Field()
+    update_item = UpdateItem.Field()
+    delete_item = DeleteItem.Field()
+    add_comment = AddComment.Field()
+    toggle_bookmark = ToggleBookmark.Field()
 
-    create_entry = CreateKnowledgeEntry.Field()
-    update_entry = UpdateKnowledgeEntry.Field()
-    delete_entry = DeleteKnowledgeEntry.Field()
 
-
-# Create schema
 schema = graphene.Schema(query=Query, mutation=Mutation)
 
 
-# GraphQL endpoint
-@api_hub.route("/graphql", methods=["POST"])
-@rate_limit("50/hour")
-def graphql():
-    """GraphQL endpoint."""
-    data = request.get_json()
+@bp.route("/graphql", methods=["GET", "POST"])
+def graphql() -> Response | str:
+    if request.method == "GET" and "query" not in request.args:
+        return render_template("api/graphiql.html")
+    if request.method == "GET":
+        query = request.args.get("query", "")
+        variables: Any = None
+        operation = request.args.get("operationName")
+    else:
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not payload.get("query"):
+            raise APIError(
+                "Body must be a JSON object with a 'query' field.",
+                400,
+                code="invalid_graphql_request",
+            )
+        query = str(payload["query"])
+        variables = payload.get("variables")
+        operation = payload.get("operationName")
+    user = resolve_api_user()
+    result = schema.execute(
+        query, variable_values=variables, operation_name=operation, context_value={"user": user}
+    )
+    body: dict[str, Any] = {}
+    if result.errors:
+        body["errors"] = [
+            {
+                "message": str(getattr(error, "original_error", None) or error),
+                "path": list(error.path or []) if getattr(error, "path", None) else None,
+            }
+            for error in result.errors
+        ]
+    if result.data is not None:
+        body["data"] = result.data
+    return jsonify(body)
 
-    if not data:
-        return jsonify({"error": "No query provided"}), 400
 
-    query = data.get("query")
-    variables = data.get("variables", {})
-    operation_name = data.get("operationName")
-
-    if not query:
-        return jsonify({"error": "No query provided"}), 400
-
-    try:
-        result = schema.execute(
-            query,
-            variables=variables,
-            operation_name=operation_name,
-            context={"user": current_user},
-        )
-
-        response_data = {"data": result.data}
-
-        if result.errors:
-            response_data["errors"] = [str(error) for error in result.errors]
-
-        return jsonify(response_data)
-
-    except Exception as e:
-        current_app.logger.error(f"GraphQL error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
-
-
-@api_hub.route("/graphql", methods=["GET"])
-def graphql_playground():
-    """GraphQL Playground interface."""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset=utf-8/>
-        <meta name="viewport" content="user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, minimal-ui">
-        <title>GraphQL Playground</title>
-        <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/graphql-playground-react/build/static/css/index.css" />
-        <link rel="shortcut icon" href="//cdn.jsdelivr.net/npm/graphql-playground-react/build/favicon.png" />
-        <script src="//cdn.jsdelivr.net/npm/graphql-playground-react/build/static/js/middleware.js"></script>
-    </head>
-    <body>
-        <div id="root">
-            <style>
-                body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol"; }
-                #root { height: 100vh; }
-            </style>
-            <div class="loading">Loading...</div>
-        </div>
-        <script>
-            window.addEventListener('load', function (event) {
-                GraphQLPlayground.init(document.getElementById('root'), {
-                    endpoint: '/api/v1/graphql'
-                })
-            })
-        </script>
-    </body>
-    </html>
-    """
+__all__ = ["schema"]
