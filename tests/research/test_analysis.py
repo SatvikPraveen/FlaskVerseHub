@@ -68,3 +68,12 @@ def test_analyzer_keeps_apostrophes_and_digits() -> None:
         "bm25",
     ]
     assert Analyzer(stem=False).analyze("Don\u2019t use py3.13 bm25") == ["py3", "13", "bm25"]
+
+
+def test_html_stripping_is_linear_on_unclosed_tags() -> None:
+    import time
+
+    start = time.perf_counter()
+    assert Analyzer(stem=False).tokenize("<" * 50_000 + "word") == ["word"]
+    assert time.perf_counter() - start < 1.0
+    assert Analyzer(stem=False).tokenize("a <b>bold</b> c") == ["a", "bold", "c"]

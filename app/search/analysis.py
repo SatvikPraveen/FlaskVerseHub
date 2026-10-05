@@ -11,7 +11,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:['\u2019][a-z]+)?", re.IGNORECASE)
-_HTML_RE = re.compile(r"<[^>]+>")
+# ``[^<>]`` (not ``[^>]``) keeps matching linear on input such as "<<<<…" with no ">".
+_HTML_RE = re.compile(r"<[^<>]+>")
 
 # A compact English stop list (Fox 1989 subset + web/programming filler).
 DEFAULT_STOPWORDS: frozenset[str] = frozenset(
