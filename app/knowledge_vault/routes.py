@@ -11,6 +11,7 @@ from app.extensions import db
 from app.knowledge_vault import bp, service
 from app.knowledge_vault.forms import BulkActionForm, CommentForm, KnowledgeItemForm
 from app.models import Bookmark, Category, Comment, KnowledgeItem, KnowledgeItemRevision, Tag
+from app.security.redirects import safe_local_path
 from app.utils.diff import inline_diff
 from app.utils.pagination import page_args, paginate
 
@@ -234,7 +235,7 @@ def bulk() -> Response:
         return redirect(url_for("knowledge_vault.index"))
     count = service.bulk_action(form.action.data, form.item_ids.data, actor=current_user)
     flash(f"Applied “{form.action.data.replace('_', ' ')}” to {count} item(s).", "success")
-    return redirect(request.referrer or url_for("knowledge_vault.index"))
+    return redirect(safe_local_path(request.referrer) or url_for("knowledge_vault.index"))
 
 
 @bp.get("/<slug>/export.<fmt>")

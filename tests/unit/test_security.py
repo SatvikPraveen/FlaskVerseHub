@@ -43,3 +43,27 @@ def test_change_ratio_bounds() -> None:
     assert change_ratio("a b c", "a b c") == 1.0
     assert change_ratio("a b c", "x y z") < 0.5
     assert 0.0 < change_ratio("a b c d", "a b x d") < 1.0
+
+
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [
+        ("/about", "/about"),
+        ("/vault/?page=2#top", "/vault/?page=2#top"),
+        ("http://localhost/vault/x?y=1", "/vault/x?y=1"),
+        ("https://evil.example/x", None),
+        ("//evil.example/x", None),
+        ("/\\evil.example", None),
+        ("\\\\evil.example", None),
+        ("javascript:alert(1)", None),
+        ("/ok\n", None),
+        ("relative/path", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_safe_local_path(app, target, expected) -> None:  # type: ignore[no-untyped-def]
+    from app.security.redirects import safe_local_path
+
+    with app.test_request_context("/", base_url="http://localhost"):
+        assert safe_local_path(target) == expected

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from urllib.parse import urljoin, urlparse
-
 from flask import (
     abort,
     current_app,
@@ -28,22 +26,13 @@ from app.auth.forms import (
 )
 from app.extensions import db, limiter
 from app.models import ApiKey, KnowledgeItem
+from app.security.redirects import safe_local_path
 from app.services.activity import record_activity
 
 
-def _is_safe_url(target: str | None) -> bool:
-    if not target:
-        return False
-    ref = urlparse(request.host_url)
-    test = urlparse(urljoin(request.host_url, target))
-    return test.scheme in {"http", "https"} and ref.netloc == test.netloc
-
-
 def _redirect_back(default: str = "main.index") -> Response:
-    target = request.args.get("next")
-    if target and _is_safe_url(target):
-        return redirect(target)
-    return redirect(url_for(default))
+    target = safe_local_path(request.args.get("next"))
+    return redirect(target or url_for(default))
 
 
 def _auth_limit() -> str:
