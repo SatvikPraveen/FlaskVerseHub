@@ -68,14 +68,22 @@ _TOPICS: list[tuple[str, str, list[str]]] = [
 ]
 
 _PARAGRAPHS = [
-    "This note explains the concept, shows a minimal implementation, and discusses the trade-offs "
-    "that matter when the system grows beyond a toy example.",
-    "The approach is compared against the obvious alternative, with attention to correctness, "
-    "operational cost, and how easy the resulting code is to test in isolation.",
-    "A worked example follows, using the FlaskVerseHub codebase as the reference implementation "
-    "so every claim can be verified by reading the source.",
-    "Finally, the note lists common pitfalls observed in production systems and how the design "
-    "presented here avoids each of them.",
+    (
+        "This note explains the concept, shows a minimal implementation, and discusses the trade-offs "
+        "that matter when the system grows beyond a toy example."
+    ),
+    (
+        "The approach is compared against the obvious alternative, with attention to correctness, "
+        "operational cost, and how easy the resulting code is to test in isolation."
+    ),
+    (
+        "A worked example follows, using the FlaskVerseHub codebase as the reference implementation "
+        "so every claim can be verified by reading the source."
+    ),
+    (
+        "Finally, the note lists common pitfalls observed in production systems and how the design "
+        "presented here avoids each of them."
+    ),
 ]
 
 

@@ -42,7 +42,8 @@ class Ranker(ABC):
     name: str = "ranker"
 
     @abstractmethod
-    def idf(self, index: InvertedIndex, term: str) -> float: ...
+    def idf(self, index: InvertedIndex, term: str) -> float:
+        """Return the inverse document frequency of ``term`` in ``index``."""
 
     @abstractmethod
     def term_weights(

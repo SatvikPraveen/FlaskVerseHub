@@ -151,7 +151,8 @@ class TestItems:
         assert updated.status_code == 200 and updated.get_json()["data"]["version"] == 2
         revisions = client.get(f"/api/v1/items/{data['slug']}/revisions").get_json()
         assert revisions["current_version"] == 2 and revisions["data"][0]["note"] == "rename"
-        assert client.delete(f"/api/v1/items/{data['slug']}", headers=headers).status_code == 204
+        deleted = client.delete(f"/api/v1/items/{data['slug']}", headers=headers)
+        assert deleted.status_code == 204
         assert client.get(f"/api/v1/items/{data['slug']}").status_code == 404
 
     def test_validation_errors(self, client: FlaskClient, user: User, token_for: Any) -> None:
@@ -184,7 +185,8 @@ class TestItems:
             ).status_code
             == 403
         )
-        assert client.delete(f"/api/v1/items/{public_item.slug}", headers=theirs).status_code == 403
+        forbidden = client.delete(f"/api/v1/items/{public_item.slug}", headers=theirs)
+        assert forbidden.status_code == 403
         assert client.get(f"/api/v1/items/{private_item.slug}", headers=theirs).status_code == 404
         assert (
             client.get(f"/api/v1/items/{private_item.slug}", headers=token_for(admin)).status_code
