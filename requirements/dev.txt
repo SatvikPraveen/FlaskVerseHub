@@ -8,7 +8,7 @@ pytest-mock>=3.12,<4.0
 pytest-benchmark>=4.0,<6.0
 hypothesis>=6.100,<7.0
 freezegun>=1.4,<2.0
-Faker>=24.0,<40.0
+Faker>=24.0,<41.0
 
 # Static analysis
 ruff>=0.5,<1.0
