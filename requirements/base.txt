@@ -40,7 +40,7 @@ structlog>=26.1.0,<27.0
 prometheus-flask-exporter>=0.23.2,<1.0
 
 # Retrieval engine (numerical core)
-numpy>=1.26,<3.0
+numpy>=2.4.6,<3.0
 
 # Configuration
 python-dotenv>=1.2.4,<2.0
